@@ -103,7 +103,7 @@ export const WORKOUT_PLAN = {
     muscles: "Full body rest",
     type: "rest",
     exercises: [],
-    cardio: "Light stretching optional"
+    cardio: "Optional"
   }
 };
 
@@ -111,8 +111,9 @@ export const MEAL_PLAN = [
   {
     time: "Morning",
     name: "Breakfast",
+    calories: 380,
     icon: "🌅",
-    items: ["☕ Milk Tea", "🥚 4 Boiled Eggs", "🍞 2 Brown Bread slices"],
+    items: ["Tea", "4 Boiled Eggs", "2 Brown Bread slices"],
     protein: 32,
     note: "Non-negotiable. Always 4 eggs."
   },
@@ -120,40 +121,45 @@ export const MEAL_PLAN = [
     time: "Lunch — Pick One",
     name: "Flexible Lunch",
     icon: "🏢",
-    items: ["🐟 Tuna Subway (best — 35-40g)", "🫙 Oikos Greek Yogurt (30g)", "🥤 Protein Shake (30g)", "🥜 Peanuts/Cashews (10-15g)"],
+    items: ["Tuna Subway (best — 35-40g)", "Oikos Greek Yogurt (30g)", "Protein Shake (30g)", "Peanuts/Cashews (10-15g)"],
     protein: 35,
+    calories: 500,
     note: "Tuna Subway whenever possible."
   },
   {
     time: "After Work · Pre Gym",
     name: "Pre-Gym Fuel",
     icon: "⚡",
-    items: ["🥜 PB on Brown Bread", "☕ Milk Tea", "🥚 +2 Eggs if light lunch"],
+    items: ["PB on Brown Bread", "Tea", "+2 Eggs if light lunch"],
     protein: 18,
+    calories: 280,
     note: "Add 2 eggs if lunch was yogurt or shake."
   },
   {
     time: "Post Gym",
     name: "Protein Shake",
     icon: "💪",
-    items: ["🥤 Whey in water — 1 serving"],
+    items: ["Whey in water — 1 serving"],
     protein: 30,
+    calories: 150,
     note: "Within 30–45 mins after gym."
   },
   {
     time: "Dinner",
-    name: "Pakistani Dinner",
+    name: "Whatever cooked",
     icon: "🍽️",
-    items: ["🍗 Chicken / Beef / Daal", "🫓 2 Wheat Roti", "Less rice", "Limit heavy gravies"],
+    items: ["Less rice", "Limit heavy gravies"],
     protein: 40,
+    calories: 650,
     note: "Bigger portion of meat/daal."
   },
   {
     time: "Dessert",
     name: "Fruit Chaat",
     icon: "🍓",
-    items: ["🍓 Seasonal fruits", "No added sugar"],
+    items: ["Seasonal fruits", "No added sugar"],
     protein: 2,
+    calories: 120,
     note: "Replaces ice cream permanently."
   }
 ];

@@ -18,14 +18,27 @@ let restRemaining = 0;
 let currentRestEl = null;
 let activeExerciseId = null;
 
+
 function defaultState() {
   return {
     logs: {},
     nutrition: {},
     bests: {},
+    userWeight: 89,  // kg
     workoutPlan: JSON.parse(JSON.stringify(WORKOUT_PLAN))
   };
 }
+
+async function saveUserWeight() {
+  const w = parseInt(document.getElementById('user-weight-input').value);
+  if (!w || w < 30 || w > 250) { showToast('Enter a valid weight', ''); return; }
+  state.userWeight = w;
+  recalcNutrition();
+  await save();
+  renderMeals();
+  showToast('Weight saved!', 'success');
+}
+window.saveUserWeight = saveUserWeight;
 
 // ── FIREBASE LOAD / SAVE ──
 async function loadFromFirebase() {
@@ -201,6 +214,59 @@ function renderWorkout() {
   list.innerHTML += `<button class="add-ex-btn" onclick="openAddEx()">+ Add Exercise</button>`;
   updateWorkoutBtn();
 }
+
+function openAddMeal() {
+  document.getElementById('add-meal-name').value = '';
+  document.getElementById('add-meal-protein').value = '';
+  document.getElementById('add-meal-calories').value = '';
+  document.getElementById('add-meal-modal').classList.add('open');
+}
+
+async function saveAddMeal() {
+  const name = document.getElementById('add-meal-name').value.trim();
+  if (!name) { showToast('Enter a meal name', ''); return; }
+
+  const protein  = parseInt(document.getElementById('add-meal-protein').value) || 0;
+  const calories = parseInt(document.getElementById('add-meal-calories').value) || 0;
+
+  const todayKey = today();
+  if (!state.nutrition[todayKey]) {
+    state.nutrition[todayKey] = { protein: 0, calories: 0, burned: 0, meals: [], customMeals: [] };
+  }
+  if (!state.nutrition[todayKey].customMeals) {
+    state.nutrition[todayKey].customMeals = [];
+  }
+
+  state.nutrition[todayKey].customMeals.push({ name, protein, calories, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+  state.nutrition[todayKey].protein   += protein;
+  state.nutrition[todayKey].calories  += calories;
+
+  await save();
+  closeAddMeal();
+  renderMeals();
+  showToast('Meal logged!', 'success');
+}
+
+async function deleteCustomMeal(idx) {
+  const todayKey = today();
+  const nut = state.nutrition[todayKey];
+  const meal = nut.customMeals[idx];
+  nut.protein   = Math.max(0, nut.protein   - meal.protein);
+  nut.calories  = Math.max(0, nut.calories  - meal.calories);
+  nut.customMeals.splice(idx, 1);
+  await save();
+  renderMeals();
+  showToast('Meal removed', '');
+}
+
+function closeAddMeal() {
+  document.getElementById('add-meal-modal').classList.remove('open');
+}
+
+window.openAddMeal    = openAddMeal;
+window.saveAddMeal    = saveAddMeal;
+window.deleteCustomMeal = deleteCustomMeal;
+window.closeAddMeal   = closeAddMeal;
 
 function renderExerciseCard(ex, idx, todayKey) {
   const log = state.logs[todayKey]?.exercises?.[ex.id] || [];
@@ -427,6 +493,7 @@ async function saveWorkout() {
   document.getElementById('workout-elapsed').textContent = '00:00';
   document.getElementById('workout-elapsed').classList.add('inactive');
   updateWorkoutBtn();
+  recalcNutrition();
   await save();
   closeModal();
   showToast('Workout saved! 💪', 'success');
@@ -439,6 +506,9 @@ function closeModal() {
 
 // ── MEALS ──
 function renderMeals() {
+    recalcNutrition();
+    const weightInput = document.getElementById('user-weight-input');
+    if (weightInput) weightInput.value = state.userWeight || 80;
   const todayKey = today();
   if (!state.nutrition[todayKey]) {
     state.nutrition[todayKey] = { protein: 0, calories: 0, burned: 0, meals: [] };
@@ -455,6 +525,22 @@ function renderMeals() {
   }).join('');
 
   document.getElementById('meal-cards').innerHTML = MEAL_PLAN.map((meal, i) => {
+    // Custom logged meals
+const customMeals = nut.customMeals || [];
+const customHtml = customMeals.length ? customMeals.map((m, i) => `
+  <div class="meal-card" style="margin-bottom:10px">
+    <div class="meal-card-header">
+      <div class="meal-icon-wrap">🍴</div>
+      <div class="meal-card-info">
+        <div class="meal-card-time">${m.time}</div>
+        <div class="meal-card-name">${m.name}</div>
+        <div class="meal-card-protein">${m.protein}g protein · ${m.calories} kcal</div>
+      </div>
+      <button class="ex-edit-btn" style="color:var(--red)" onclick="deleteCustomMeal(${i})">✕</button>
+    </div>
+  </div>`).join('') : '';
+
+document.getElementById('custom-meal-cards').innerHTML = customHtml;
     const logged = nut.meals.includes(i);
     return `<div class="meal-card" style="margin-bottom:10px">
       <div class="meal-card-header">
@@ -474,6 +560,7 @@ function renderMeals() {
       </div>
     </div>`;
   }).join('');
+  
 
   document.getElementById('cal-intake-display').textContent = nut.calories.toLocaleString();
   document.getElementById('cal-burned-display').textContent = nut.burned.toLocaleString();
@@ -500,18 +587,35 @@ async function toggleMeal(idx) {
   renderMeals();
 }
 
-async function logCalories() {
+function calcBurned() {
   const todayKey = today();
-  const intake = parseInt(document.getElementById('cal-intake-input').value) || 0;
-  const burned = parseInt(document.getElementById('cal-burned-input').value) || 0;
+  const log = state.logs[todayKey];
+  const weightKg = state.userWeight || 80; // fallback 80kg
+  const durationHrs = (log?.duration || 0) / 3600;
+  const MET = 5; // moderate weightlifting
+  return Math.round(MET * weightKg * durationHrs);
+}
 
-  state.nutrition[todayKey].calories = intake;
-  state.nutrition[todayKey].burned = burned;
-  await save();
-  renderMeals();
-  showToast('Calories logged!', 'success');
-  document.getElementById('cal-intake-input').value = '';
-  document.getElementById('cal-burned-input').value = '';
+function recalcNutrition() {
+  const todayKey = today();
+  if (!state.nutrition[todayKey]) return;
+  const nut = state.nutrition[todayKey];
+
+  // from preset meal plan
+  const mealPlanCals = (nut.meals || []).reduce((sum, i) => {
+    return sum + (MEAL_PLAN[i]?.calories || 0);
+  }, 0);
+  const mealPlanProtein = (nut.meals || []).reduce((sum, i) => {
+    return sum + (MEAL_PLAN[i]?.protein || 0);
+  }, 0);
+
+  // from custom logged meals
+  const customCals    = (nut.customMeals || []).reduce((sum, m) => sum + (m.calories || 0), 0);
+  const customProtein = (nut.customMeals || []).reduce((sum, m) => sum + (m.protein  || 0), 0);
+
+  nut.calories = mealPlanCals + customCals;
+  nut.protein  = mealPlanProtein + customProtein;
+  nut.burned   = calcBurned();
 }
 
 // ── WEEKLY ──

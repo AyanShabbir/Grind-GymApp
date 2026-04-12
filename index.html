@@ -998,34 +998,43 @@
 
       <div id="meal-cards"></div>
 
+      <!-- Custom logged meals -->
+    <div id="custom-meal-cards"></div>
+
+    <!-- Add meal button -->
+    <button class="add-ex-btn" onclick="openAddMeal()">+ Log Custom Meal</button>
+
       <div class="calorie-logger">
-        <div class="cl-title">Log Calories</div>
-        <div class="cl-row">
-          <input class="cl-input" type="number" id="cal-intake-input" placeholder="Calories eaten" />
+      <div class="cl-title">Calorie Summary</div>
+
+      <!-- weight input -->
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px">
+        <div class="edit-label" style="white-space:nowrap;margin:0">Your weight</div>
+        <input class="cl-input" style="width:80px;text-align:center" type="number"
+          id="user-weight-input" placeholder="kg" />
+        <button class="cl-add-btn" onclick="saveUserWeight()">Set</button>
+        <div style="font-size:11px;color:var(--muted)">used to estimate burn</div>
+      </div>
+
+      <div class="cl-summary">
+        <div class="cl-sum-item">
+          <div class="cl-sum-label">Eaten</div>
+          <div class="cl-sum-val green" id="cal-intake-display">0</div>
         </div>
-        <div class="cl-row">
-          <input class="cl-input" type="number" id="cal-burned-input" placeholder="Calories burned (gym)" />
-          <button class="cl-add-btn" onclick="logCalories()">Log</button>
+        <div class="cl-sum-item">
+          <div class="cl-sum-label">Burned</div>
+          <div class="cl-sum-val red" id="cal-burned-display">0</div>
         </div>
-        <div class="cl-summary">
-          <div class="cl-sum-item">
-            <div class="cl-sum-label">Intake</div>
-            <div class="cl-sum-val green" id="cal-intake-display">0</div>
-          </div>
-          <div class="cl-sum-item">
-            <div class="cl-sum-label">Burned</div>
-            <div class="cl-sum-val red" id="cal-burned-display">0</div>
-          </div>
-          <div class="cl-sum-item">
-            <div class="cl-sum-label">Net</div>
-            <div class="cl-sum-val" id="cal-net-display">0</div>
-          </div>
-          <div class="cl-sum-item">
-            <div class="cl-sum-label">Target</div>
-            <div class="cl-sum-val" style="color:var(--muted2)">2,200</div>
-          </div>
+        <div class="cl-sum-item">
+          <div class="cl-sum-label">Net</div>
+          <div class="cl-sum-val" id="cal-net-display">0</div>
+        </div>
+        <div class="cl-sum-item">
+          <div class="cl-sum-label">Target</div>
+          <div class="cl-sum-val" style="color:var(--muted2)">2,200</div>
         </div>
       </div>
+    </div>
     </div>
   </div>
 
@@ -1125,6 +1134,31 @@
 </div>
 
 <!-- Finish Modal -->
+<!-- Add Meal Modal -->
+<div class="modal-overlay" id="add-meal-modal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" style="font-size:18px;margin-bottom:16px">Log Meal</div>
+
+    <div class="edit-label">What did you eat?</div>
+    <input class="cl-input" style="width:100%;margin-bottom:10px" type="text" id="add-meal-name" placeholder="e.g. Chicken & Rice" />
+
+    <div style="display:flex;gap:10px;margin-bottom:16px">
+      <div style="flex:1">
+        <div class="edit-label">Protein (g)</div>
+        <input class="cl-input" style="width:100%" type="number" id="add-meal-protein" placeholder="0" />
+      </div>
+      <div style="flex:1">
+        <div class="edit-label">Calories</div>
+        <input class="cl-input" style="width:100%" type="number" id="add-meal-calories" placeholder="0" />
+      </div>
+    </div>
+
+    <button class="modal-btn primary" onclick="saveAddMeal()">Log Meal</button>
+    <button class="modal-btn secondary" onclick="closeAddMeal()">Cancel</button>
+  </div>
+</div>
+
 <!-- Add Exercise Modal -->
 <div class="modal-overlay" id="add-ex-modal">
   <div class="modal-sheet">
