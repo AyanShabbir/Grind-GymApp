@@ -1,0 +1,41 @@
+# Grind — Your Personal Workout Tracker
+
+## Files
+- `index.html` — Main app shell
+- `app.js` — All app logic
+- `data.js` — Your PPL routine + meal plan
+- `manifest.json` — PWA config (for iPhone home screen)
+- `vercel.json` — Vercel deployment config
+
+## Deploy to Vercel
+
+### Option A — Vercel Dashboard (easiest)
+1. Go to vercel.com → New Project
+2. Drag and drop the entire `gymapp` folder
+3. Click Deploy — done, you'll get a URL like `grind.vercel.app`
+
+### Option B — Vercel CLI
+```bash
+npm i -g vercel
+cd gymapp
+vercel
+```
+
+## Add to iPhone Home Screen
+1. Open the Vercel URL in Safari (must be Safari)
+2. Tap the Share button (box with arrow)
+3. Scroll down → tap "Add to Home Screen"
+4. Name it "Grind" → tap Add
+5. It opens full screen like a real app
+
+## Features
+- Today's workout auto-loaded based on day of week
+- Log weight + reps per set
+- Automatic rest timer (1:30) after each set
+- PR detection — alerts when you beat your best
+- Workout timer with start/pause/finish
+- Meal logging with protein tracker
+- Calorie intake + burned logging
+- Weekly summary — sessions done, missed, PRs, protein averages
+- Weight progress chart per exercise
+- All data saved locally on your phone
