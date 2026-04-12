@@ -1,10 +1,14 @@
 import { WORKOUT_PLAN, MEAL_PLAN } from './data.js';
+import { db } from './firebase.js';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 // ── STATE ──
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const DAY_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
-let state = loadState();
+const STATE_DOC = doc(db, 'users', 'default'); // swap 'default' for uid when you add auth
+
+let state = defaultState();
 let workoutTimer = null;
 let workoutStart = null;
 let workoutElapsed = 0;
@@ -14,22 +18,40 @@ let restRemaining = 0;
 let currentRestEl = null;
 let activeExerciseId = null;
 
-function loadState() {
-  try {
-    return JSON.parse(localStorage.getItem('grind_state') || 'null') || defaultState();
-  } catch { return defaultState(); }
-}
-
 function defaultState() {
   return {
-    logs: {},       // { "YYYY-MM-DD": { workoutDone, duration, sets, exercises: {exId: [{weight, reps, done}]}, prs: [] } }
-    nutrition: {},  // { "YYYY-MM-DD": { protein, calories, burned, meals: [] } }
-    bests: {}       // { exId: {weight, reps, date} }
+    logs: {},
+    nutrition: {},
+    bests: {},
+    workoutPlan: JSON.parse(JSON.stringify(WORKOUT_PLAN))
   };
 }
 
-function save() {
-  localStorage.setItem('grind_state', JSON.stringify(state));
+// ── FIREBASE LOAD / SAVE ──
+async function loadFromFirebase() {
+  try {
+    const snap = await getDoc(STATE_DOC);
+    if (snap.exists()) {
+      const saved = snap.data();
+      // Inject workoutPlan if missing (same guard as before)
+      if (!saved.workoutPlan) {
+        saved.workoutPlan = JSON.parse(JSON.stringify(WORKOUT_PLAN));
+      }
+      state = saved;
+    }
+    // If no doc exists yet, state stays as defaultState()
+  } catch (err) {
+    console.error('Firebase load failed, falling back to default state:', err);
+  }
+}
+
+async function save() {
+  try {
+    await setDoc(STATE_DOC, state);
+  } catch (err) {
+    console.error('Firebase save failed:', err);
+    showToast('Save failed — check connection', 'error');
+  }
 }
 
 function today() {
@@ -69,7 +91,7 @@ function setGreeting() {
 function renderHome() {
   setGreeting();
   const day = todayDay();
-  const plan = WORKOUT_PLAN[day];
+  const plan = state.workoutPlan[day];
 
   const badge = document.getElementById('today-badge');
   badge.textContent = plan.type === 'rest' ? 'Rest Day' : plan.name;
@@ -110,7 +132,7 @@ function renderWeekStrip() {
   const todayStr = today();
 
   strip.innerHTML = weekDates.map(({ date, day }) => {
-    const plan = WORKOUT_PLAN[day];
+    const plan = state.workoutPlan[day];
     const isToday = date === todayStr;
     const isDone = state.logs[date]?.workoutDone;
     const isPast = date < todayStr;
@@ -129,7 +151,7 @@ function renderQuickStats() {
   const weekDates = getWeekDates();
   let sessions = 0, totalProtein = 0, proteinDays = 0, prs = 0;
 
-  weekDates.forEach(({ date, day }) => {
+  weekDates.forEach(({ date }) => {
     const log = state.logs[date];
     const nut = state.nutrition[date];
     if (log?.workoutDone) sessions++;
@@ -141,12 +163,11 @@ function renderQuickStats() {
   document.getElementById('avg-protein').textContent = proteinDays ? Math.round(totalProtein / proteinDays) + 'g' : '0g';
   document.getElementById('prs-count').textContent = prs;
 
-  // Streak
   let streak = 0;
   for (let i = 0; i >= -30; i--) {
     const dk = dateKey(i);
     const dDay = DAYS[new Date(dk + 'T12:00:00').getDay()];
-    if (WORKOUT_PLAN[dDay].type === 'rest') continue;
+    if (state.workoutPlan[dDay].type === 'rest') continue;
     if (state.logs[dk]?.workoutDone) streak++;
     else if (dk < today()) break;
   }
@@ -156,10 +177,9 @@ function renderQuickStats() {
 // ── WORKOUT ──
 function renderWorkout() {
   const day = todayDay();
-  const plan = WORKOUT_PLAN[day];
+  const plan = state.workoutPlan[day];
   const todayKey = today();
 
-  // Init today's log if needed
   if (!state.logs[todayKey]) {
     state.logs[todayKey] = { workoutDone: false, duration: 0, sets: 0, exercises: {}, prs: [] };
   }
@@ -178,8 +198,7 @@ function renderWorkout() {
   }
 
   list.innerHTML = plan.exercises.map((ex, idx) => renderExerciseCard(ex, idx, todayKey)).join('');
-
-  // Restore rest timer visibility
+  list.innerHTML += `<button class="add-ex-btn" onclick="openAddEx()">+ Add Exercise</button>`;
   updateWorkoutBtn();
 }
 
@@ -193,7 +212,7 @@ function renderExerciseCard(ex, idx, todayKey) {
     const isDone = setLog.done;
     return `<div class="set-row" id="set-${ex.id}-${i}">
       <div class="set-num">${i + 1}</div>
-      <input class="set-input" type="number" placeholder="kg" value="${setLog.weight || ''}"
+      <input class="set-input" type="number" placeholder="lb" value="${setLog.weight || ''}"
         onchange="updateSet('${ex.id}', ${i}, 'weight', this.value)"
         id="w-${ex.id}-${i}" />
       <input class="set-input" type="number" placeholder="${ex.reps}" value="${setLog.reps || ''}"
@@ -217,15 +236,16 @@ function renderExerciseCard(ex, idx, todayKey) {
       </div>
       <div class="ex-target">
         <strong>${ex.sets}×${ex.reps}</strong>
-        ${best ? `Best: ${best.weight}kg` : 'No history'}
+        ${best ? `Best: ${best.weight}lb` : 'No history'}
       </div>
+      <button class="ex-edit-btn" onclick="openEditEx(event,'${ex.id}')">✎</button>
       <div class="ex-check ${allDone ? 'checked' : ''}" id="excheck-${ex.id}">
         ${allDone ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>` : ''}
       </div>
     </div>
     <div class="sets-table" id="sets-${ex.id}" style="display:none">
       <div class="sets-header">
-        <span>Set</span><span>Weight (kg)</span><span>Reps</span><span style="text-align:center">✓</span>
+        <span>Set</span><span>Weight (lb)</span><span>Reps</span><span style="text-align:center">✓</span>
       </div>
       ${setsHtml}
     </div>
@@ -246,16 +266,16 @@ function toggleExCard(exId) {
   if (!isOpen) activeExerciseId = exId;
 }
 
-function updateSet(exId, setIdx, field, value) {
+async function updateSet(exId, setIdx, field, value) {
   const todayKey = today();
   if (!state.logs[todayKey]) state.logs[todayKey] = { workoutDone: false, duration: 0, sets: 0, exercises: {}, prs: [] };
   if (!state.logs[todayKey].exercises[exId]) state.logs[todayKey].exercises[exId] = [];
   if (!state.logs[todayKey].exercises[exId][setIdx]) state.logs[todayKey].exercises[exId][setIdx] = {};
   state.logs[todayKey].exercises[exId][setIdx][field] = parseFloat(value) || 0;
-  save();
+  await save();
 }
 
-function toggleSetDone(exId, setIdx) {
+async function toggleSetDone(exId, setIdx) {
   const todayKey = today();
   const log = state.logs[todayKey]?.exercises?.[exId]?.[setIdx];
   if (!log) return;
@@ -267,17 +287,13 @@ function toggleSetDone(exId, setIdx) {
   btn.innerHTML = log.done ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>` : '';
 
   if (log.done) {
-    // Check PR
     checkPR(exId, log.weight, log.reps);
-    // Start rest timer
     startRestTimer(exId);
-    // Count sets
     state.logs[todayKey].sets = Object.values(state.logs[todayKey].exercises)
       .flat().filter(s => s?.done).length;
   }
 
-  // Check if all sets done
-  const plan = WORKOUT_PLAN[todayDay()];
+  const plan = state.workoutPlan[todayDay()];
   const ex = plan.exercises.find(e => e.id === exId);
   const exLog = state.logs[todayKey].exercises[exId] || [];
   const allDone = exLog.length >= ex.sets && exLog.every(s => s?.done);
@@ -290,26 +306,25 @@ function toggleSetDone(exId, setIdx) {
     check.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>`;
   }
 
-  save();
+  await save();
 }
 
-function checkPR(exId, weight, reps) {
+async function checkPR(exId, weight, reps) {
   if (!weight) return;
   const best = state.bests[exId];
   if (!best || weight > best.weight || (weight === best.weight && reps > best.reps)) {
     const wasPR = !!best;
     state.bests[exId] = { weight, reps, date: today() };
     const todayLog = state.logs[today()];
-    if (wasPR && (!todayLog.prs.includes(exId))) {
+    if (wasPR && !todayLog.prs.includes(exId)) {
       todayLog.prs.push(exId);
       showToast('🏆 New PR!', 'success');
     }
-    save();
+    await save();
   }
 }
 
 function startRestTimer(exId) {
-  // Clear any existing rest timer
   if (restTimer) { clearInterval(restTimer); restTimer = null; }
   if (currentRestEl) document.getElementById(`rest-${currentRestEl}`)?.style.setProperty('display', 'none');
 
@@ -318,7 +333,7 @@ function startRestTimer(exId) {
   if (!restEl || !restTimeEl) return;
 
   currentRestEl = exId;
-  restRemaining = 60; // 1:00 default rest
+  restRemaining = 60;
   restEl.style.display = 'flex';
   restEl.classList.add('active');
   updateRestDisplay(restTimeEl, restRemaining);
@@ -349,13 +364,9 @@ function skipRest(exId) {
   currentRestEl = null;
 }
 
-// Workout timer
+// ── WORKOUT TIMER ──
 function toggleWorkout() {
-  if (isWorkoutRunning) {
-    pauseWorkout();
-  } else {
-    startWorkout();
-  }
+  isWorkoutRunning ? pauseWorkout() : startWorkout();
 }
 
 function startWorkout() {
@@ -401,12 +412,12 @@ function finishWorkout() {
   document.getElementById('modal-prs').textContent = prs;
   document.getElementById('modal-sub').textContent =
     sets > 15 ? 'Absolute beast mode today.' :
-    sets > 8 ? 'Solid session. Keep it up.' : 'Every rep counts. Come back stronger.';
+    sets > 8  ? 'Solid session. Keep it up.' : 'Every rep counts. Come back stronger.';
 
   document.getElementById('finish-modal').classList.add('open');
 }
 
-function saveWorkout() {
+async function saveWorkout() {
   const todayKey = today();
   if (!state.logs[todayKey]) state.logs[todayKey] = { exercises: {}, prs: [] };
   state.logs[todayKey].workoutDone = true;
@@ -416,7 +427,7 @@ function saveWorkout() {
   document.getElementById('workout-elapsed').textContent = '00:00';
   document.getElementById('workout-elapsed').classList.add('inactive');
   updateWorkoutBtn();
-  save();
+  await save();
   closeModal();
   showToast('Workout saved! 💪', 'success');
   renderHome();
@@ -434,18 +445,15 @@ function renderMeals() {
   }
   const nut = state.nutrition[todayKey];
 
-  // Protein bar
   const pct = Math.min((nut.protein / 160) * 100, 100);
   document.getElementById('protein-logged').textContent = nut.protein;
   document.getElementById('protein-fill').style.width = pct + '%';
 
-  // Meal dots
   document.getElementById('meal-dots').innerHTML = MEAL_PLAN.map((m, i) => {
     const logged = nut.meals.includes(i);
     return `<div class="dpb-meal ${logged ? 'logged' : ''}">${m.icon}<br>${logged ? '✓' : '—'}</div>`;
   }).join('');
 
-  // Meal cards
   document.getElementById('meal-cards').innerHTML = MEAL_PLAN.map((meal, i) => {
     const logged = nut.meals.includes(i);
     return `<div class="meal-card" style="margin-bottom:10px">
@@ -467,7 +475,6 @@ function renderMeals() {
     </div>`;
   }).join('');
 
-  // Calorie summary
   document.getElementById('cal-intake-display').textContent = nut.calories.toLocaleString();
   document.getElementById('cal-burned-display').textContent = nut.burned.toLocaleString();
   const net = nut.calories - nut.burned;
@@ -476,7 +483,7 @@ function renderMeals() {
   netEl.className = `cl-sum-val ${net <= 2200 ? 'green' : 'red'}`;
 }
 
-function toggleMeal(idx) {
+async function toggleMeal(idx) {
   const todayKey = today();
   const nut = state.nutrition[todayKey];
   const meal = MEAL_PLAN[idx];
@@ -489,18 +496,18 @@ function toggleMeal(idx) {
     nut.protein += meal.protein;
   }
 
-  save();
+  await save();
   renderMeals();
 }
 
-function logCalories() {
+async function logCalories() {
   const todayKey = today();
   const intake = parseInt(document.getElementById('cal-intake-input').value) || 0;
   const burned = parseInt(document.getElementById('cal-burned-input').value) || 0;
 
   state.nutrition[todayKey].calories = intake;
   state.nutrition[todayKey].burned = burned;
-  save();
+  await save();
   renderMeals();
   showToast('Calories logged!', 'success');
   document.getElementById('cal-intake-input').value = '';
@@ -516,7 +523,7 @@ function renderWeekly() {
   let bestProtein = 0, worstProtein = 999;
 
   weekDates.forEach(({ date, day }) => {
-    const plan = WORKOUT_PLAN[day];
+    const plan = state.workoutPlan[day];
     const log = state.logs[date];
     const nut = state.nutrition[date];
     const isPast = date <= todayStr;
@@ -551,9 +558,8 @@ function renderWeekly() {
   document.getElementById('w-avg-calories').textContent = avgCal ? avgCal.toLocaleString() : '—';
   document.getElementById('w-avg-burned').textContent = avgBurned ? avgBurned.toLocaleString() : '—';
 
-  // Sessions list
   document.getElementById('weekly-sessions-list').innerHTML = weekDates.map(({ date, day }) => {
-    const plan = WORKOUT_PLAN[day];
+    const plan = state.workoutPlan[day];
     const log = state.logs[date];
     const isPast = date < todayStr;
     const isToday = date === todayStr;
@@ -578,7 +584,7 @@ function renderWeekly() {
 
 function renderProgressSelector() {
   const sel = document.getElementById('progress-ex-select');
-  const allExercises = Object.values(WORKOUT_PLAN).flatMap(d => d.exercises || []);
+  const allExercises = Object.values(state.workoutPlan).flatMap(d => d.exercises || []);
   sel.innerHTML = allExercises.map(ex =>
     `<option value="${ex.id}">${ex.name}</option>`
   ).join('');
@@ -588,7 +594,6 @@ function renderProgressChart() {
   const exId = document.getElementById('progress-ex-select').value;
   const bars = document.getElementById('chart-bars');
 
-  // Gather last 8 sessions where this exercise was logged
   const entries = [];
   for (let i = -60; i <= 0; i++) {
     const dk = dateKey(i);
@@ -611,7 +616,7 @@ function renderProgressChart() {
     const pct = (e.weight / maxW) * 100;
     const isBest = e.weight === maxW;
     return `<div class="chart-bar-wrap">
-      <div class="chart-bar-label">${e.weight}kg</div>
+      <div class="chart-bar-label">${e.weight}lb</div>
       <div class="chart-bar ${isBest ? 'best' : ''}" style="height:${pct}%"></div>
       <div class="chart-bar-date">${e.date}</div>
     </div>`;
@@ -636,6 +641,46 @@ function goToWorkout() {
   switchScreen('workout');
 }
 
+function openAddEx() {
+  document.getElementById('add-ex-name').value = '';
+  document.getElementById('add-ex-sets').value = '3';
+  document.getElementById('add-ex-reps').value = '10–12';
+  document.getElementById('add-ex-notes').value = '';
+  document.getElementById('add-ex-type').value = 'compound';
+  document.getElementById('add-ex-modal').classList.add('open');
+}
+
+async function saveAddEx() {
+  const name = document.getElementById('add-ex-name').value.trim();
+  if (!name) { showToast('Enter a name', ''); return; }
+
+  const day = todayDay();
+  const plan = state.workoutPlan[day];
+
+  const newEx = {
+    id: 'custom_' + Date.now(),
+    name,
+    sets: parseInt(document.getElementById('add-ex-sets').value) || 3,
+    reps: document.getElementById('add-ex-reps').value.trim() || '10–12',
+    notes: document.getElementById('add-ex-notes').value.trim(),
+    type: document.getElementById('add-ex-type').value,
+  };
+
+  plan.exercises.push(newEx);
+  await save();
+  closeAddEx();
+  renderWorkout();
+  showToast('Exercise added!', 'success');
+}
+
+function closeAddEx() {
+  document.getElementById('add-ex-modal').classList.remove('open');
+}
+
+window.openAddEx  = openAddEx;
+window.saveAddEx  = saveAddEx;
+window.closeAddEx = closeAddEx;
+
 // ── TOAST ──
 function showToast(msg, type = '') {
   const t = document.getElementById('toast');
@@ -659,5 +704,71 @@ window.toggleMeal = toggleMeal;
 window.logCalories = logCalories;
 window.renderProgressChart = renderProgressChart;
 
-// ── INIT ──
-renderHome();
+// ── EXERCISE EDITOR ──
+// Add this edit button to renderExerciseCard, inside .exercise-card-header, before the closing div:
+// <button class="ex-edit-btn" onclick="openEditEx(event,'${ex.id}')">✎</button>
+
+function openEditEx(e, exId) {
+  e.stopPropagation(); // don't toggle the card open
+  const day = todayDay();
+  const plan = state.workoutPlan[day];
+  const ex = plan.exercises.find(e => e.id === exId);
+  if (!ex) return;
+
+  document.getElementById('edit-ex-id').value = exId;
+  document.getElementById('edit-ex-name').value = ex.name;
+  document.getElementById('edit-ex-sets').value = ex.sets;
+  document.getElementById('edit-ex-reps').value = ex.reps;
+  document.getElementById('edit-ex-notes').value = ex.notes || '';
+
+  document.getElementById('edit-ex-modal').classList.add('open');
+}
+
+async function saveEditEx() {
+  const day = todayDay();
+  const plan = state.workoutPlan[day];
+  const exId = document.getElementById('edit-ex-id').value;
+  const ex = plan.exercises.find(e => e.id === exId);
+  if (!ex) return;
+
+  ex.name  = document.getElementById('edit-ex-name').value.trim() || ex.name;
+  ex.sets  = parseInt(document.getElementById('edit-ex-sets').value) || ex.sets;
+  ex.reps  = document.getElementById('edit-ex-reps').value.trim() || ex.reps;
+  ex.notes = document.getElementById('edit-ex-notes').value.trim();
+
+  await save();
+  closeEditEx();
+  renderWorkout();
+  showToast('Exercise updated!', 'success');
+}
+
+async function deleteEditEx() {
+  const day = todayDay();
+  const plan = state.workoutPlan[day];
+  const exId = document.getElementById('edit-ex-id').value;
+  plan.exercises = plan.exercises.filter(e => e.id !== exId);
+
+  await save();
+  closeEditEx();
+  renderWorkout();
+  showToast('Exercise removed', '');
+}
+
+function closeEditEx() {
+  document.getElementById('edit-ex-modal').classList.remove('open');
+}
+
+window.openEditEx  = openEditEx;
+window.saveEditEx  = saveEditEx;
+window.deleteEditEx = deleteEditEx;
+window.closeEditEx = closeEditEx;
+
+// ── INIT — load from Firebase first, then render ──
+async function init() {
+  // Show a loading indicator while fetching from Firestore
+  document.getElementById('greeting-text').textContent = 'Loading...';
+  await loadFromFirebase();
+  renderHome();
+}
+
+init();

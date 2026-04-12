@@ -868,6 +868,38 @@
     input[type="number"] { -moz-appearance: textfield; }
     input[type="number"]::-webkit-outer-spin-button,
     input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+
+  .ex-edit-btn {
+  background: none; border: none; color: var(--muted);
+  font-size: 16px; cursor: pointer; padding: 4px 6px;
+  border-radius: 6px; flex-shrink: 0;
+  transition: color 0.15s;
+}
+.ex-edit-btn:hover { color: var(--accent); }
+.edit-label {
+  font-size: 10px; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 1.5px; margin-bottom: 6px;
+}
+
+.add-ex-btn {
+  width: 100%;
+  padding: 14px;
+  margin-top: 4px;
+  border-radius: 14px;
+  border: 1px dashed var(--border2);
+  background: none;
+  color: var(--muted);
+  font-family: 'Syne', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.add-ex-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+
   </style>
 </head>
 <body>
@@ -1093,6 +1125,41 @@
 </div>
 
 <!-- Finish Modal -->
+<!-- Add Exercise Modal -->
+<div class="modal-overlay" id="add-ex-modal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" style="font-size:18px;margin-bottom:16px">Add Exercise</div>
+
+    <div class="edit-label">Name</div>
+    <input class="cl-input" style="width:100%;margin-bottom:10px" type="text" id="add-ex-name" placeholder="e.g. Cable Fly" />
+
+    <div style="display:flex;gap:10px;margin-bottom:10px">
+      <div style="flex:1">
+        <div class="edit-label">Sets</div>
+        <input class="cl-input" style="width:100%" type="number" id="add-ex-sets" value="3" />
+      </div>
+      <div style="flex:1">
+        <div class="edit-label">Reps</div>
+        <input class="cl-input" style="width:100%" type="text" id="add-ex-reps" placeholder="10–12" />
+      </div>
+    </div>
+
+    <div class="edit-label">Type</div>
+    <select class="ex-selector" style="margin:0 0 10px" id="add-ex-type">
+      <option value="compound">Compound</option>
+      <option value="isolation">Isolation</option>
+      <option value="core">Core</option>
+    </select>
+
+    <div class="edit-label">Notes</div>
+    <input class="cl-input" style="width:100%;margin-bottom:16px" type="text" id="add-ex-notes" placeholder="Optional cue..." />
+
+    <button class="modal-btn primary" onclick="saveAddEx()">Add Exercise</button>
+    <button class="modal-btn secondary" onclick="closeAddEx()">Cancel</button>
+  </div>
+</div>
+
 <div class="modal-overlay" id="finish-modal">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
@@ -1119,6 +1186,47 @@
 
 <div class="toast" id="toast"></div>
 
+<script type="importmap">
+{
+  "imports": {
+    "firebase/app": "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"
+  }
+}
+</script>
+
 <script type="module" src="app.js"></script>
+<!-- Edit Exercise Modal -->
+<div class="modal-overlay" id="edit-ex-modal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" style="font-size:18px;margin-bottom:16px">Edit Exercise</div>
+    <input type="hidden" id="edit-ex-id" />
+
+    <div class="edit-field">
+      <div class="edit-label">Name</div>
+      <input class="cl-input" style="width:100%;margin-bottom:10px" type="text" id="edit-ex-name" />
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:10px">
+      <div style="flex:1">
+        <div class="edit-label">Sets</div>
+        <input class="cl-input" style="width:100%" type="number" id="edit-ex-sets" />
+      </div>
+      <div style="flex:1">
+        <div class="edit-label">Reps</div>
+        <input class="cl-input" style="width:100%" type="text" id="edit-ex-reps" placeholder="e.g. 8–10" />
+      </div>
+    </div>
+    <div class="edit-field">
+      <div class="edit-label">Notes</div>
+      <input class="cl-input" style="width:100%;margin-bottom:16px" type="text" id="edit-ex-notes" placeholder="Optional cue..." />
+    </div>
+
+    <button class="modal-btn primary" onclick="saveEditEx()">Save Changes</button>
+    <button class="modal-btn secondary" style="color:var(--red);margin-top:8px" onclick="deleteEditEx()">Delete Exercise</button>
+    <button class="modal-btn secondary" onclick="closeEditEx()">Cancel</button>
+  </div>
+</div>
+
 </body>
 </html>
