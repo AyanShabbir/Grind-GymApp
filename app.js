@@ -71,6 +71,22 @@ async function save() {
   }
 }
 
+// Recently added
+function cleanForFirestore(obj) {
+  return JSON.parse(JSON.stringify(obj, (key, val) => 
+    val === undefined ? null : val
+  ));
+}
+
+async function save() {
+  try {
+    await setDoc(STATE_DOC, cleanForFirestore(state));
+  } catch (err) {
+    console.error('Firebase save failed:', err);
+    showToast('Save failed — check connection', 'error');
+  }
+}
+
 function today() {
   return new Date().toISOString().split('T')[0];
 }
