@@ -1,6 +1,8 @@
 import { WORKOUT_PLAN, MEAL_PLAN } from './data.js';
+// import { db } from './firebase.js';
+// import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './firebase.js';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ── STATE ──
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
