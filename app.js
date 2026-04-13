@@ -872,10 +872,31 @@ window.deleteEditEx = deleteEditEx;
 window.closeEditEx = closeEditEx;
 
 // ── INIT — load from Firebase first, then render ──
+// async function init() {
+//   // Show a loading indicator while fetching from Firestore
+//   document.getElementById('greeting-text').textContent = 'Loading...';
+//   await loadFromFirebase();
+//   renderHome();
+// }
 async function init() {
-  // Show a loading indicator while fetching from Firestore
   document.getElementById('greeting-text').textContent = 'Loading...';
   await loadFromFirebase();
+  
+  // Fix: convert any exercise set objects back to arrays after loading
+  Object.values(state.logs).forEach(log => {
+    if (!log.exercises) return;
+    Object.keys(log.exercises).forEach(exId => {
+      const sets = log.exercises[exId];
+      if (!Array.isArray(sets)) {
+        // Firestore turned the array into an object — convert it back
+        const max = Math.max(...Object.keys(sets).map(Number));
+        const arr = [];
+        for (let i = 0; i <= max; i++) arr[i] = sets[i] || null;
+        log.exercises[exId] = arr;
+      }
+    });
+  });
+
   renderHome();
 }
 
