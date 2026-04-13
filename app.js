@@ -31,10 +31,6 @@ function defaultState() {
   };
 }
 
-//Added recently
-function cleanForFirestore(obj) {
-  return JSON.parse(JSON.stringify(obj, (key, val) => val === undefined ? null : val));
-}
 async function saveUserWeight() {
   const w = parseInt(document.getElementById('user-weight-input').value);
   if (!w || w < 30 || w > 250) { showToast('Enter a valid weight', ''); return; }
@@ -64,16 +60,6 @@ async function loadFromFirebase() {
   }
 }
 
-async function save() {
-  try {
-    await setDoc(STATE_DOC,cleanForFirestore(state));
-  } catch (err) {
-    console.error('Firebase save failed:', err);
-    showToast('Save failed — check connection', 'error');
-  }
-}
-
-// Recently added
 function cleanForFirestore(obj) {
   return JSON.parse(JSON.stringify(obj, (key, val) => 
     val === undefined ? null : val
