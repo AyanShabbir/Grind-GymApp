@@ -813,7 +813,6 @@ window.updateSet = updateSet;
 window.toggleSetDone = toggleSetDone;
 window.skipRest = skipRest;
 window.toggleMeal = toggleMeal;
-window.logCalories = logCalories;
 window.renderProgressChart = renderProgressChart;
 
 // ── EXERCISE EDITOR ──
