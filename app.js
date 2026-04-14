@@ -86,6 +86,7 @@ async function save() {
         ? nut.customMeals.filter(x => x != null)
         : Object.values(nut.customMeals);
     });
+    saveDailySnapshot();
     await setDoc(STATE_DOC, cleanForFirestore(state));
   } catch (err) {
     console.error('Firebase save failed:', err);
@@ -695,12 +696,27 @@ function recalcNutrition() {
   nut.burned   = calcBurned();
 }
 
+// function saveDailySnapshot() {
+//   const todayKey = today();
+//   const nut = state.nutrition[todayKey];
+//   if (!nut) return;
+//   // Store a permanent snapshot that recalcNutrition won't overwrite
+//   if (!state.dailySnapshots) state.dailySnapshots = {};
+//   state.dailySnapshots[todayKey] = {
+//     protein:  nut.protein,
+//     calories: nut.calories,
+//     burned:   nut.burned,
+//     net:      nut.calories - nut.burned,
+//     date:     todayKey
+//   };
+// }
+
 function saveDailySnapshot() {
   const todayKey = today();
   const nut = state.nutrition[todayKey];
   if (!nut) return;
-  // Store a permanent snapshot that recalcNutrition won't overwrite
   if (!state.dailySnapshots) state.dailySnapshots = {};
+  // Always overwrite with latest values so it stays current
   state.dailySnapshots[todayKey] = {
     protein:  nut.protein,
     calories: nut.calories,
