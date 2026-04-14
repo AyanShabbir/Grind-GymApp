@@ -125,7 +125,10 @@ function getWeekDates() {
   for (let i = 0; i < 7; i++) {
     const d = new Date(now);
     d.setDate(now.getDate() - dow + i);
-    dates.push({ date: d.toISOString().split('T')[0], day: DAYS[i] });
+    dates.push({
+      date: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`,
+      day: DAYS[i]
+    });
   }
   return dates;
 }
@@ -755,6 +758,19 @@ function saveDailySnapshot() {
   };
 }
 
+function saveDailySnapshot_for(dk) {
+  const nut = state.nutrition[dk];
+  if (!nut) return;
+  if (!state.dailySnapshots) state.dailySnapshots = {};
+  state.dailySnapshots[dk] = {
+    protein:  nut.protein,
+    calories: nut.calories,
+    burned:   nut.burned,
+    net:      nut.calories - nut.burned,
+    date:     dk
+  };
+}
+
 // ── WEEKLY ──
 function renderWeekly() {
   const weekDates = getWeekDates();
@@ -1045,18 +1061,7 @@ if (state.nutrition[yesterday] && (!state.dailySnapshots?.[yesterday])) {
   saveDailySnapshot_for(yesterday);
 }
 
-function saveDailySnapshot_for(dateKey) {
-  const nut = state.nutrition[dateKey];
-  if (!nut) return;
-  if (!state.dailySnapshots) state.dailySnapshots = {};
-  state.dailySnapshots[dateKey] = {
-    protein:  nut.protein,
-    calories: nut.calories,
-    burned:   nut.burned,
-    net:      nut.calories - nut.burned,
-    date:     dateKey
-  };
-}
+
 
   renderHome();
 }
