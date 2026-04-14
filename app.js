@@ -294,22 +294,38 @@ window.saveAddMeal    = saveAddMeal;
 window.deleteCustomMeal = deleteCustomMeal;
 window.closeAddMeal   = closeAddMeal;
 
+// Look back up to 30 days for last logged weight/reps for this exercise 04/13
+function getLastLog(exId) {
+  for (let d = 1; d <= 30; d++) {
+    const dk = dateKey(-d);
+    const sets = state.logs[dk]?.exercises?.[exId];
+    if (!sets) continue;
+    const done = (Array.isArray(sets) ? sets : Object.values(sets)).filter(s => s?.done && s.weight);
+    if (done.length) return done[done.length - 1];
+  }
+  return null;
+}
+
 function renderExerciseCard(ex, idx, todayKey) {
   const log = state.logs[todayKey]?.exercises?.[ex.id] || [];
   const allDone = log.length >= ex.sets && log.every(s => s.done);
   const best = state.bests[ex.id];
 
   const setsHtml = Array.from({ length: ex.sets }, (_, i) => {
+    // const setLog = log[i] || {};
+    const last = !log.length ? getLastLog(ex.id) : null;
     const setLog = log[i] || {};
+    const prefillWeight = setLog.weight || last?.weight || '';
+    const prefillReps   = setLog.reps   || last?.reps   || '';
     const isDone = setLog.done;
     return `<div class="set-row" id="set-${ex.id}-${i}">
       <div class="set-num">${i + 1}</div>
-      <input class="set-input" type="number" placeholder="lb" value="${setLog.weight || ''}"
-        onchange="updateSet('${ex.id}', ${i}, 'weight', this.value)"
-        id="w-${ex.id}-${i}" />
-      <input class="set-input" type="number" placeholder="${ex.reps}" value="${setLog.reps || ''}"
-        onchange="updateSet('${ex.id}', ${i}, 'reps', this.value)"
-        id="r-${ex.id}-${i}" />
+      <input class="set-input" type="number" placeholder="lb" value="${prefillWeight}"
+      onchange="updateSet('${ex.id}', ${i}, 'weight', this.value)"
+      id="w-${ex.id}-${i}" />
+    <input class="set-input" type="number" placeholder="${ex.reps}" value="${prefillReps}"
+      onchange="updateSet('${ex.id}', ${i}, 'reps', this.value)"
+      id="r-${ex.id}-${i}" />
       <button class="set-done-btn ${isDone ? 'done' : ''}" onclick="toggleSetDone('${ex.id}', ${i})"
         id="sd-${ex.id}-${i}">
         ${isDone ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>` : ''}
@@ -461,6 +477,19 @@ function toggleWorkout() {
   isWorkoutRunning ? pauseWorkout() : startWorkout();
 }
 
+// function startWorkout() {
+//   isWorkoutRunning = true;
+//   workoutStart = Date.now() - workoutElapsed * 1000;
+//   const elapsedEl = document.getElementById('workout-elapsed');
+//   elapsedEl.classList.remove('inactive');
+//   workoutTimer = setInterval(() => {
+//     workoutElapsed = Math.floor((Date.now() - workoutStart) / 1000);
+//     elapsedEl.textContent = formatTime(workoutElapsed);
+//   }, 1000);
+//   updateWorkoutBtn();
+// }
+
+// Auto save every 30 sec update 04/13
 function startWorkout() {
   isWorkoutRunning = true;
   workoutStart = Date.now() - workoutElapsed * 1000;
@@ -469,6 +498,8 @@ function startWorkout() {
   workoutTimer = setInterval(() => {
     workoutElapsed = Math.floor((Date.now() - workoutStart) / 1000);
     elapsedEl.textContent = formatTime(workoutElapsed);
+    // Auto-save every 30 seconds
+    if (workoutElapsed % 30 === 0) save();
   }, 1000);
   updateWorkoutBtn();
 }
@@ -520,6 +551,7 @@ async function saveWorkout() {
   document.getElementById('workout-elapsed').classList.add('inactive');
   updateWorkoutBtn();
   recalcNutrition();
+  saveDailySnapshot();
   await save();
   closeModal();
   showToast('Workout saved! 💪', 'success');
@@ -642,6 +674,21 @@ function recalcNutrition() {
   nut.calories = mealPlanCals + customCals;
   nut.protein  = mealPlanProtein + customProtein;
   nut.burned   = calcBurned();
+}
+
+function saveDailySnapshot() {
+  const todayKey = today();
+  const nut = state.nutrition[todayKey];
+  if (!nut) return;
+  // Store a permanent snapshot that recalcNutrition won't overwrite
+  if (!state.dailySnapshots) state.dailySnapshots = {};
+  state.dailySnapshots[todayKey] = {
+    protein:  nut.protein,
+    calories: nut.calories,
+    burned:   nut.burned,
+    net:      nut.calories - nut.burned,
+    date:     todayKey
+  };
 }
 
 // ── WEEKLY ──
@@ -927,6 +974,25 @@ Object.values(state.nutrition).forEach(nut => {
     nut.customMeals = Object.values(nut.customMeals);
   }
 });
+
+  // Snapshot yesterday's nutrition on app open (catches end-of-day)
+const yesterday = dateKey(-1);
+if (state.nutrition[yesterday] && (!state.dailySnapshots?.[yesterday])) {
+  saveDailySnapshot_for(yesterday);
+}
+
+function saveDailySnapshot_for(dateKey) {
+  const nut = state.nutrition[dateKey];
+  if (!nut) return;
+  if (!state.dailySnapshots) state.dailySnapshots = {};
+  state.dailySnapshots[dateKey] = {
+    protein:  nut.protein,
+    calories: nut.calories,
+    burned:   nut.burned,
+    net:      nut.calories - nut.burned,
+    date:     dateKey
+  };
+}
 
   renderHome();
 }
