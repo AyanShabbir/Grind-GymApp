@@ -160,6 +160,25 @@ function renderHome() {
     startBtn.className = 'start-workout-btn';
     startBtn.style = '';
   }
+    // Nutrition history 04/13
+  const snapshots = state.dailySnapshots || {};
+  const historyEl = document.getElementById('nutrition-history-list');
+  const recent = Object.values(snapshots)
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 7);
+  
+  if (!recent.length) {
+    historyEl.innerHTML = `<div style="font-size:12px;color:var(--muted);padding:8px 0">No history yet</div>`;
+  } else {
+    historyEl.innerHTML = recent.map(s => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="font-size:12px;color:var(--muted2)">${s.date.slice(5)}</div>
+        <div style="font-size:12px;font-family:'DM Mono',monospace;color:var(--accent)">${s.protein}g</div>
+        <div style="font-size:12px;font-family:'DM Mono',monospace;color:var(--muted2)">${s.calories} kcal</div>
+        <div style="font-size:12px;font-family:'DM Mono',monospace;color:${s.net <= 2200 ? 'var(--accent)' : 'var(--red)'}">${s.net} net</div>
+      </div>
+    `).join('');
+}
 
   renderWeekStrip();
   renderQuickStats();
