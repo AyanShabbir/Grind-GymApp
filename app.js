@@ -66,8 +66,26 @@ function cleanForFirestore(obj) {
   ));
 }
 
+// async function save() {
+//   try {
+//     await setDoc(STATE_DOC, cleanForFirestore(state));
+//   } catch (err) {
+//     console.error('Firebase save failed:', err);
+//     showToast('Save failed — check connection', 'error');
+//   }
+// }
+
 async function save() {
   try {
+    // Ensure all nutrition arrays are clean dense arrays before saving
+    Object.values(state.nutrition).forEach(nut => {
+      if (nut.meals) nut.meals = Array.isArray(nut.meals)
+        ? nut.meals.filter(x => x != null)
+        : Object.values(nut.meals);
+      if (nut.customMeals) nut.customMeals = Array.isArray(nut.customMeals)
+        ? nut.customMeals.filter(x => x != null)
+        : Object.values(nut.customMeals);
+    });
     await setDoc(STATE_DOC, cleanForFirestore(state));
   } catch (err) {
     console.error('Firebase save failed:', err);
@@ -899,6 +917,16 @@ async function init() {
       }
     });
   });
+
+  // Fix nutrition arrays corrupted by Firestore
+Object.values(state.nutrition).forEach(nut => {
+  if (nut.meals && !Array.isArray(nut.meals)) {
+    nut.meals = Object.values(nut.meals);
+  }
+  if (nut.customMeals && !Array.isArray(nut.customMeals)) {
+    nut.customMeals = Object.values(nut.customMeals);
+  }
+});
 
   renderHome();
 }
