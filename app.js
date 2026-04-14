@@ -665,13 +665,32 @@ async function toggleMeal(idx) {
   renderMeals();
 }
 
+// function calcBurned() {
+//   const todayKey = today();
+//   const log = state.logs[todayKey];
+//   const weightKg = state.userWeight || 80; // fallback 80kg
+//   const durationHrs = (log?.duration || 0) / 3600;
+//   const MET = 5; // moderate weightlifting
+//   return Math.round(MET * weightKg * durationHrs);
+// }
+
 function calcBurned() {
   const todayKey = today();
   const log = state.logs[todayKey];
-  const weightKg = state.userWeight || 80; // fallback 80kg
-  const durationHrs = (log?.duration || 0) / 3600;
-  const MET = 5; // moderate weightlifting
-  return Math.round(MET * weightKg * durationHrs);
+  const weightKg = state.userWeight || 80;
+
+  const savedDuration = log?.duration || 0;
+  const liveDuration = (savedDuration === 0 && workoutElapsed > 0) ? workoutElapsed : savedDuration;
+  const liftingHrs = liveDuration / 3600;
+
+  // Cardio warmup (fixed — 10 min bike + 10 min treadmill, always done)
+  const bikeKcal = 8.0 * weightKg * (10 / 60);
+  const treadmillKcal = 9.0 * weightKg * (10 / 60);
+
+  // Weightlifting (based on actual session duration)
+  const liftingKcal = 5.0 * weightKg * liftingHrs;
+
+  return Math.round(bikeKcal + treadmillKcal + liftingKcal);
 }
 
 function recalcNutrition() {
