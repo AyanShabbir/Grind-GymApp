@@ -937,29 +937,36 @@
       <div class="week-strip" id="week-strip"></div>
 
       <div class="quick-stats">
-        <div class="stat-card">
-          <div class="sc-label">This Week</div>
-          <div class="sc-val" id="week-sessions">0</div>
-          <div class="sc-sub">sessions done</div>
+          <div class="stat-card">
+            <div class="sc-label">This Week</div>
+            <div class="sc-val" id="week-sessions">0</div>
+            <div class="sc-sub">sessions done</div>
+          </div>
+          <div class="stat-card">
+            <div class="sc-label">Streak</div>
+            <div class="sc-val" id="streak-count">0</div>
+            <div class="sc-sub">days in a row</div>
+          </div>
+          <div class="stat-card">
+            <div class="sc-label">Avg Protein</div>
+            <div class="sc-val" id="avg-protein">0g</div>
+            <div class="sc-sub">this week</div>
+          </div>
+          <div class="stat-card">
+            <div class="sc-label">PRs This Week</div>
+            <div class="sc-val" id="prs-count">0</div>
+            <div class="sc-sub">personal records</div>
+          </div>
         </div>
-        <div class="stat-card">
-          <div class="sc-label">Streak</div>
-          <div class="sc-val" id="streak-count">0</div>
-          <div class="sc-sub">days in a row</div>
+
+        <!-- ADD THIS ↓ -->
+        <div class="stat-card" id="nutrition-history">
+          <div class="sc-label">Nutrition History</div>
+          <div id="nutrition-history-list"></div>
         </div>
-        <div class="stat-card">
-          <div class="sc-label">Avg Protein</div>
-          <div class="sc-val" id="avg-protein">0g</div>
-          <div class="sc-sub">this week</div>
-        </div>
-        <div class="stat-card">
-          <div class="sc-label">PRs This Week</div>
-          <div class="sc-val" id="prs-count">0</div>
-          <div class="sc-sub">personal records</div>
-        </div>
+
       </div>
     </div>
-  </div>
 
   <!-- WORKOUT -->
   <div class="screen" id="screen-workout">
