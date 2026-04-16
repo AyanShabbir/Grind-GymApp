@@ -741,7 +741,7 @@ function calcBurned() {
 
   const bikeKcal = 8.0 * weightKg * ((log?.cardioMinutes?.bike || 0) / 60);
   const treadmillKcal = 9.0 * weightKg * ((log?.cardioMinutes?.treadmill || 0) / 60);
-  const liftingKcal = 5.0 * weightKg * liftingHrs;
+  const liftingKcal = 4.5 * weightKg * liftingHrs;
 
   return Math.round(bikeKcal + treadmillKcal + liftingKcal);
 }
