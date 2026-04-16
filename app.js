@@ -253,7 +253,7 @@ function renderWorkout() {
   const todayKey = today();
 
   if (!state.logs[todayKey]) {
-    state.logs[todayKey] = { workoutDone: false, duration: 0, sets: 0, exercises: {}, prs: [] };
+    state.logs[todayKey] = { workoutDone: false, duration: 0, sets: 0, exercises: {}, prs: [], cardioMinutes: { bike: 0, treadmill: 0 } };
   }
 
   document.getElementById('workout-day-name').textContent = plan.name;
@@ -272,7 +272,39 @@ function renderWorkout() {
   list.innerHTML = plan.exercises.map((ex, idx) => renderExerciseCard(ex, idx, todayKey)).join('');
   list.innerHTML += `<button class="add-ex-btn" onclick="openAddEx()">+ Add Exercise</button>`;
   updateWorkoutBtn();
+
+  const cardioLog = state.logs[todayKey]?.cardioMinutes || {};
+  document.getElementById('cardio-section').innerHTML = `
+    <div style="display:flex;gap:10px;align-items:center">
+      <div style="flex:1">
+        <div class="edit-label">🚴 Bike (min)</div>
+        <input class="set-input" type="number" id="cardio-bike-input" 
+          placeholder="0" value="${cardioLog.bike || ''}"
+          style="width:100%" />
+      </div>
+      <div style="flex:1">
+        <div class="edit-label">🏃 Treadmill (min)</div>
+        <input class="set-input" type="number" id="cardio-treadmill-input" 
+          placeholder="0" value="${cardioLog.treadmill || ''}"
+          style="width:100%" />
+      </div>
+      <button class="cl-add-btn" style="align-self:flex-end" onclick="saveCardio()">Log</button>
+    </div>`;
 }
+
+async function saveCardio() {
+  const todayKey = today();
+  if (!state.logs[todayKey]) return;
+  
+  const bike = parseInt(document.getElementById('cardio-bike-input').value) || 0;
+  const treadmill = parseInt(document.getElementById('cardio-treadmill-input').value) || 0;
+  
+  state.logs[todayKey].cardioMinutes = { bike, treadmill };
+  await save();
+  recalcNutrition();
+  showToast('Cardio logged!', 'success');
+}
+window.saveCardio = saveCardio;
 
 function openAddMeal() {
   document.getElementById('add-meal-name').value = '';
@@ -681,10 +713,20 @@ async function toggleMeal(idx) {
 // function calcBurned() {
 //   const todayKey = today();
 //   const log = state.logs[todayKey];
-//   const weightKg = state.userWeight || 80; // fallback 80kg
-//   const durationHrs = (log?.duration || 0) / 3600;
-//   const MET = 5; // moderate weightlifting
-//   return Math.round(MET * weightKg * durationHrs);
+//   const weightKg = state.userWeight || 80;
+
+//   const savedDuration = log?.duration || 0;
+//   const liveDuration = (savedDuration === 0 && workoutElapsed > 0) ? workoutElapsed : savedDuration;
+//   const liftingHrs = liveDuration / 3600;
+
+//   // Cardio warmup (fixed — 10 min bike + 10 min treadmill, always done)
+//   const bikeKcal = 8.0 * weightKg * (10 / 60);
+//   const treadmillKcal = 9.0 * weightKg * (10 / 60);
+
+//   // Weightlifting (based on actual session duration)
+//   const liftingKcal = 5.0 * weightKg * liftingHrs;
+
+//   return Math.round(bikeKcal + treadmillKcal + liftingKcal);
 // }
 
 function calcBurned() {
@@ -696,11 +738,8 @@ function calcBurned() {
   const liveDuration = (savedDuration === 0 && workoutElapsed > 0) ? workoutElapsed : savedDuration;
   const liftingHrs = liveDuration / 3600;
 
-  // Cardio warmup (fixed — 10 min bike + 10 min treadmill, always done)
-  const bikeKcal = 8.0 * weightKg * (10 / 60);
-  const treadmillKcal = 9.0 * weightKg * (10 / 60);
-
-  // Weightlifting (based on actual session duration)
+  const bikeKcal = 8.0 * weightKg * ((log?.cardioMinutes?.bike || 0) / 60);
+  const treadmillKcal = 9.0 * weightKg * ((log?.cardioMinutes?.treadmill || 0) / 60);
   const liftingKcal = 5.0 * weightKg * liftingHrs;
 
   return Math.round(bikeKcal + treadmillKcal + liftingKcal);
