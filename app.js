@@ -261,13 +261,14 @@ function renderWorkout() {
 
   const list = document.getElementById('exercise-list');
   if (plan.type === 'rest') {
-    list.innerHTML = `<div style="text-align:center;padding:60px 20px;color:var(--muted)">
-      <div style="font-size:48px;margin-bottom:16px">😴</div>
-      <div style="font-size:18px;font-weight:700;margin-bottom:8px">Rest Day</div>
-      <div style="font-size:13px">Recovery is part of the program.</div>
-    </div>`;
-    return;
-  }
+  list.innerHTML = `<div style="text-align:center;padding:60px 20px;color:var(--muted)">
+    <div style="font-size:48px;margin-bottom:16px">😴</div>
+    <div style="font-size:18px;font-weight:700;margin-bottom:8px">Rest Day</div>
+    <div style="font-size:13px">Recovery is part of the program.</div>
+  </div>`;
+  document.getElementById('cardio-section').innerHTML = ''; 
+  return;
+}
 
   list.innerHTML = plan.exercises.map((ex, idx) => renderExerciseCard(ex, idx, todayKey)).join('');
   list.innerHTML += `<button class="add-ex-btn" onclick="openAddEx()">+ Add Exercise</button>`;
