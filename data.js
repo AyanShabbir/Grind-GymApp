@@ -290,7 +290,7 @@ export const MEAL_PLAN = [
     icon: "",
     items: ["1 Scoop NitroTech Whey (water)", "1 Banana"],
     protein: 30,
-    note: "~260 kcal | ~30g protein"
+    note: "~260 kcal | ~31g protein"
   },
   {
     time: "After Work · Pre Gym",
@@ -324,8 +324,8 @@ export const MEAL_PLAN = [
     name: "Night Snack",
     calories: 135,
     icon: "",
-    items: ["150–200g Greek Yogurt"],
-    protein: 14,
-    note: "~120–150 kcal | ~12–15g protein"
+    items: ["150–200g Greek Yogurt and any fruit"],
+    protein: 21,
+    note: "~200 kcal | ~21g protein"
   }
 ];
