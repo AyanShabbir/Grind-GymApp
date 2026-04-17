@@ -180,7 +180,6 @@ function renderHome() {
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
         <div style="font-size:12px;color:var(--muted2)">${s.date.slice(5)}</div>
         <div style="font-size:12px;font-family:'DM Mono',monospace;color:var(--accent)">${s.protein}g</div>
-        <div style="font-size:12px;font-family:'DM Mono',monospace;color:var(--muted2)">${s.calories} kcal</div>
         <div style="font-size:12px;font-family:'DM Mono',monospace;color:${s.calories <= 2400 ? 'var(--accent)' : 'var(--red)'}">${s.calories} kcal</div>
       </div>
     `).join('');
