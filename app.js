@@ -181,7 +181,7 @@ function renderHome() {
         <div style="font-size:12px;color:var(--muted2)">${s.date.slice(5)}</div>
         <div style="font-size:12px;font-family:'DM Mono',monospace;color:var(--accent)">${s.protein}g</div>
         <div style="font-size:12px;font-family:'DM Mono',monospace;color:var(--muted2)">${s.calories} kcal</div>
-        <div style="font-size:12px;font-family:'DM Mono',monospace;color:${s.net <= 2200 ? 'var(--accent)' : 'var(--red)'}">${s.net} net</div>
+        <div style="font-size:12px;font-family:'DM Mono',monospace;color:${s.calories <= 2400 ? 'var(--accent)' : 'var(--red)'}">${s.calories} kcal</div>
       </div>
     `).join('');
 }
@@ -677,13 +677,15 @@ document.getElementById('custom-meal-cards').innerHTML = customHtml;
     </div>`;
   }).join('');
   
-
+  // 04/17
+  // document.getElementById('cal-intake-display').textContent = nut.calories.toLocaleString();
+  // document.getElementById('cal-burned-display').textContent = nut.burned.toLocaleString();
+  // const net = nut.calories - nut.burned;
+  // const netEl = document.getElementById('cal-net-display');
+  // netEl.textContent = net.toLocaleString();
+  // netEl.className = `cl-sum-val ${net <= 2200 ? 'green' : 'red'}`;
   document.getElementById('cal-intake-display').textContent = nut.calories.toLocaleString();
   document.getElementById('cal-burned-display').textContent = nut.burned.toLocaleString();
-  const net = nut.calories - nut.burned;
-  const netEl = document.getElementById('cal-net-display');
-  netEl.textContent = net.toLocaleString();
-  netEl.className = `cl-sum-val ${net <= 2200 ? 'green' : 'red'}`;
 }
 
 async function toggleMeal(idx) {
@@ -785,7 +787,6 @@ function saveDailySnapshot() {
     protein:  nut.protein,
     calories: nut.calories,
     burned:   nut.burned,
-    net:      nut.calories - nut.burned,
     date:     todayKey
   };
 }
@@ -798,7 +799,6 @@ function saveDailySnapshot_for(dk) {
     protein:  nut.protein,
     calories: nut.calories,
     burned:   nut.burned,
-    net:      nut.calories - nut.burned,
     date:     dk
   };
 }
@@ -841,7 +841,7 @@ function renderWeekly() {
   document.getElementById('w-protein').textContent = avgProtein + 'g';
   document.getElementById('w-time').textContent = Math.round(totalTime / 60) + 'm';
   document.getElementById('w-prs').textContent = totalPRs;
-  document.getElementById('w-calories').textContent = avgCal ? (avgCal - avgBurned).toLocaleString() : '—';
+  document.getElementById('w-calories').textContent = avgCal ? `${avgCal} / 2400` : '—';
   document.getElementById('w-best-protein').textContent = bestProtein ? bestProtein + 'g' : '—';
   document.getElementById('w-worst-protein').textContent = (worstProtein < 999 && worstProtein > 0) ? worstProtein + 'g' : '—';
   document.getElementById('w-avg-calories').textContent = avgCal ? avgCal.toLocaleString() : '—';
