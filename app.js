@@ -106,12 +106,6 @@ function todayDay() {
   return DAYS[new Date().getDay()];
 }
 
-// function dateKey(offset = 0) {
-//   const d = new Date();
-//   d.setDate(d.getDate() + offset);
-//   return d.toISOString().split('T')[0];
-// }
-
 function dateKey(offset = 0) {
   const d = new Date();
   d.setDate(d.getDate() + offset);
