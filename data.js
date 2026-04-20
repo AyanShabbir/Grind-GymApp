@@ -220,6 +220,7 @@ export const MEAL_PLAN = [
     note: "~200 kcal | ~21g protein"
   },
   {
+    time: "Custom",
     name: "Tortilla",
     calories: 110,
     icon: "",
@@ -227,6 +228,7 @@ export const MEAL_PLAN = [
     note: "~110 kcal | ~4g protein"
   },
   {
+    time: "Custom",
     name: "Sweet Egg",
     calories: 200,
     icon: "",
@@ -234,6 +236,7 @@ export const MEAL_PLAN = [
     note: "~200 kcal | ~16g protein"
   },
   {
+    time: "Custom",
     name: "Tea",
     calories: 130,
     icon: "",
@@ -241,6 +244,7 @@ export const MEAL_PLAN = [
     note: "~130 kcal | ~8g protein"
   },
   {
+    time: "Custom",
     name: "Egg (1)",
     calories: 80,
     icon: "",
@@ -248,6 +252,7 @@ export const MEAL_PLAN = [
     note: "~80 kcal | ~7g protein"
   },
   {
+    time: "Custom",
     name: "Bread (1 slice)",
     calories: 70,
     icon: "",
@@ -255,6 +260,7 @@ export const MEAL_PLAN = [
     note: "~70 kcal | ~3g protein"
   },
   {
+    time: "Custom",
     name: "Shami Kabab",
     calories: 100,
     icon: "",
@@ -262,6 +268,7 @@ export const MEAL_PLAN = [
     note: "~100 kcal | ~12g protein"
   },
   {
+    time: "Custom",
     name: "Chicken Leg",
     calories: 150,
     icon: "",
@@ -269,6 +276,7 @@ export const MEAL_PLAN = [
     note: "~150 kcal | ~22g protein"
   },
   {
+    time: "Custom",
     name: "Chicken Thigh",
     calories: 200,
     icon: "",
@@ -276,6 +284,7 @@ export const MEAL_PLAN = [
     note: "~200 kcal | ~23g protein"
   },
   {
+    time: "Custom",
     name: "Chicken Breast",
     calories: 150,
     icon: "",
@@ -283,6 +292,7 @@ export const MEAL_PLAN = [
     note: "~150 kcal | ~28g protein"
   },
   {
+    time: "Custom",
     name: "Oats & Whey Dessert",
     calories: 570,
     icon: "",
@@ -290,4 +300,3 @@ export const MEAL_PLAN = [
     note: "~570 kcal | ~50g protein"
   },
 ];
-
