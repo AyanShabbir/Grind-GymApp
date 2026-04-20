@@ -670,7 +670,7 @@ document.getElementById('custom-meal-cards').innerHTML = customHtml;
         </button>
       </div>
       <div class="meal-items-list">
-        ${meal.items.map(item => `<div class="meal-item">${item}</div>`).join('')}
+        ${(meal.items || []).map(item => `<div class="meal-item">${item}</div>`).join('')}
         <div class="meal-note-text">${meal.note}</div>
       </div>
     </div>`;
