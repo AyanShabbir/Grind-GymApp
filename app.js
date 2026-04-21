@@ -413,10 +413,10 @@ function renderExerciseCard(ex, idx, todayKey) {
     return `<div class="set-row" id="set-${ex.id}-${i}">
       <div class="set-num">${i + 1}</div>
       <input class="set-input" type="number" placeholder="lb" value="${prefillWeight}"
-      onchange="updateSet('${ex.id}', ${i}, 'weight', this.value)"
+      oninput="updateSet('${ex.id}', ${i}, 'weight', this.value)"
       id="w-${ex.id}-${i}" />
     <input class="set-input" type="number" placeholder="${ex.reps}" value="${prefillReps}"
-      onchange="updateSet('${ex.id}', ${i}, 'reps', this.value)"
+      oninput="updateSet('${ex.id}', ${i}, 'reps', this.value)"
       id="r-${ex.id}-${i}" />
       <button class="set-done-btn ${isDone ? 'done' : ''}" onclick="toggleSetDone('${ex.id}', ${i})"
         id="sd-${ex.id}-${i}">
@@ -475,19 +475,63 @@ async function updateSet(exId, setIdx, field, value) {
   await save();
 }
 
+// async function toggleSetDone(exId, setIdx) {
+//   const todayKey = today();
+//   const log = state.logs[todayKey]?.exercises?.[exId]?.[setIdx];
+//   if (!log) return;
+
+//   log.done = !log.done;
+
+//   const btn = document.getElementById(`sd-${exId}-${setIdx}`);
+//   btn.className = `set-done-btn ${log.done ? 'done' : ''}`;
+//   btn.innerHTML = log.done ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>` : '';
+
+//   if (log.done) {
+//     checkPR(exId, log.weight, log.reps);
+//     startRestTimer(exId);
+//     state.logs[todayKey].sets = Object.values(state.logs[todayKey].exercises)
+//       .flat().filter(s => s?.done).length;
+//   }
+
+//   const plan = state.workoutPlan[todayDay()];
+//   const ex = plan.exercises.find(e => e.id === exId);
+//   const exLog = state.logs[todayKey].exercises[exId] || [];
+//   const allDone = exLog.length >= ex.sets && exLog.every(s => s?.done);
+
+//   const card = document.getElementById(`excard-${exId}`);
+//   const check = document.getElementById(`excheck-${exId}`);
+//   if (allDone) {
+//     card.classList.add('done-ex');
+//     check.className = 'ex-check checked';
+//     check.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>`;
+//   }
+
+//   await save();
+// }
+
+// 04/21
 async function toggleSetDone(exId, setIdx) {
   const todayKey = today();
-  const log = state.logs[todayKey]?.exercises?.[exId]?.[setIdx];
-  if (!log) return;
+  if (!state.logs[todayKey]) state.logs[todayKey] = { workoutDone: false, duration: 0, sets: 0, exercises: {}, prs: [] };
+  if (!state.logs[todayKey].exercises[exId]) state.logs[todayKey].exercises[exId] = [];
+  if (!state.logs[todayKey].exercises[exId][setIdx]) state.logs[todayKey].exercises[exId][setIdx] = {};
 
-  log.done = !log.done;
+  const setLog = state.logs[todayKey].exercises[exId][setIdx];
+
+  // Read input values from DOM at the moment of tapping done
+  const weightEl = document.getElementById(`w-${exId}-${setIdx}`);
+  const repsEl   = document.getElementById(`r-${exId}-${setIdx}`);
+  if (weightEl && weightEl.value) setLog.weight = parseFloat(weightEl.value) || 0;
+  if (repsEl   && repsEl.value)   setLog.reps   = parseFloat(repsEl.value)   || 0;
+
+  setLog.done = !setLog.done;
 
   const btn = document.getElementById(`sd-${exId}-${setIdx}`);
-  btn.className = `set-done-btn ${log.done ? 'done' : ''}`;
-  btn.innerHTML = log.done ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>` : '';
+  btn.className = `set-done-btn ${setLog.done ? 'done' : ''}`;
+  btn.innerHTML = setLog.done ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>` : '';
 
-  if (log.done) {
-    checkPR(exId, log.weight, log.reps);
+  if (setLog.done) {
+    checkPR(exId, setLog.weight, setLog.reps);
     startRestTimer(exId);
     state.logs[todayKey].sets = Object.values(state.logs[todayKey].exercises)
       .flat().filter(s => s?.done).length;
