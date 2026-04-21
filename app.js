@@ -17,7 +17,8 @@ let restTimer = null;
 let restRemaining = 0;
 let currentRestEl = null;
 let activeExerciseId = null;
-
+let _qtyMealIdx = null;
+let _qtyVal = 1;
 
 function defaultState() {
   return {
@@ -64,14 +65,48 @@ function cleanForFirestore(obj) {
   ));
 }
 
-// async function save() {
-//   try {
-//     await setDoc(STATE_DOC, cleanForFirestore(state));
-//   } catch (err) {
-//     console.error('Firebase save failed:', err);
-//     showToast('Save failed — check connection', 'error');
-//   }
-// }
+
+//04/21
+function openQtyModal(mealIdx) {
+  const meal = MEAL_PLAN[mealIdx];
+  const nut = state.nutrition[today()] || {};
+  _qtyMealIdx = mealIdx;
+  _qtyVal = nut.mealQuantities?.[mealIdx] || 1;
+
+  document.getElementById('qty-modal-name').textContent = meal.name;
+  document.getElementById('qty-modal-macros').textContent = `${meal.protein}g protein · ${meal.calories} kcal each`;
+  document.getElementById('qty-modal-val').textContent = _qtyVal;
+  document.getElementById('qty-modal').classList.add('open');
+}
+
+function changeQtyModal(delta) {
+  _qtyVal = Math.max(0, _qtyVal + delta);
+  document.getElementById('qty-modal-val').textContent = _qtyVal;
+}
+
+async function confirmQty() {
+  const todayKey = today();
+  if (!state.nutrition[todayKey]) {
+    state.nutrition[todayKey] = { protein: 0, calories: 0, burned: 0, meals: [], customMeals: [], mealQuantities: {} };
+  }
+  const nut = state.nutrition[todayKey];
+  if (!nut.mealQuantities) nut.mealQuantities = {};
+  nut.mealQuantities[_qtyMealIdx] = _qtyVal;
+  recalcNutrition();
+  await save();
+  closeQtyModal();
+  renderMeals();
+  showToast(_qtyVal === 0 ? 'Removed' : 'Logged!', 'success');
+}
+
+function closeQtyModal() {
+  document.getElementById('qty-modal').classList.remove('open');
+}
+
+window.openQtyModal = openQtyModal;
+window.changeQtyModal = changeQtyModal;
+window.confirmQty = confirmQty;
+window.closeQtyModal = closeQtyModal;
 
 async function save() {
   try {
@@ -641,6 +676,24 @@ function renderMeals() {
 
   document.getElementById('meal-cards').innerHTML = MEAL_PLAN.map((meal, i) => {
     // Custom logged meals
+    const isCustom = meal.time === 'Custom';          // ← ADD
+    const qty = nut.mealQuantities?.[i] || 0;         // ← ADD
+
+  if (isCustom) {                                   // ← ADD this whole block
+    return `<div class="meal-card" style="margin-bottom:10px">
+      <div class="meal-card-header">
+        <div class="meal-icon-wrap">${meal.icon || '🍽️'}</div>
+        <div class="meal-card-info">
+          <div class="meal-card-time">${meal.time}</div>
+          <div class="meal-card-name">${meal.name}</div>
+          <div class="meal-card-protein">${qty ? `${meal.protein * qty}g protein · ${meal.calories * qty} kcal` : meal.note}</div>
+        </div>
+        <button class="meal-log-btn ${qty ? 'logged' : ''}" onclick="openQtyModal(${i})">
+          ${qty ? `${qty}× ✓` : 'Log'}
+        </button>
+      </div>
+    </div>`;
+  }
 const customMeals = nut.customMeals || [];
 const customHtml = customMeals.length ? customMeals.map((m, i) => `
   <div class="meal-card" style="margin-bottom:10px">
@@ -665,7 +718,7 @@ document.getElementById('custom-meal-cards').innerHTML = customHtml;
           <div class="meal-card-name">${meal.name}</div>
           <div class="meal-card-protein">~${meal.protein}g protein</div>
         </div>
-        <button class="meal-log-btn ${logged ? 'logged' : ''}" onclick="toggleMeal(${i})">
+        <button class="meal-log-btn ${logged ? 'logged' : ''}" onclick="openQtyModal(${i})">
           ${logged ? 'Logged ✓' : 'Log'}
         </button>
       </div>
@@ -739,42 +792,51 @@ function calcBurned() {
   return Math.round(bikeKcal + treadmillKcal + liftingKcal);
 }
 
+// function recalcNutrition() {
+//   const todayKey = today();
+//   if (!state.nutrition[todayKey]) return;
+//   const nut = state.nutrition[todayKey];
+
+//   // from preset meal plan
+//   const mealPlanCals = (nut.meals || []).reduce((sum, i) => {
+//     return sum + (MEAL_PLAN[i]?.calories || 0);
+//   }, 0);
+//   const mealPlanProtein = (nut.meals || []).reduce((sum, i) => {
+//     return sum + (MEAL_PLAN[i]?.protein || 0);
+//   }, 0);
+
+//   // from custom logged meals
+//   const customCals    = (nut.customMeals || []).reduce((sum, m) => sum + (m.calories || 0), 0);
+//   const customProtein = (nut.customMeals || []).reduce((sum, m) => sum + (m.protein  || 0), 0);
+
+//   nut.calories = mealPlanCals + customCals;
+//   nut.protein  = mealPlanProtein + customProtein;
+//   nut.burned   = calcBurned();
+// }
+
 function recalcNutrition() {
   const todayKey = today();
   if (!state.nutrition[todayKey]) return;
   const nut = state.nutrition[todayKey];
 
-  // from preset meal plan
-  const mealPlanCals = (nut.meals || []).reduce((sum, i) => {
-    return sum + (MEAL_PLAN[i]?.calories || 0);
-  }, 0);
-  const mealPlanProtein = (nut.meals || []).reduce((sum, i) => {
-    return sum + (MEAL_PLAN[i]?.protein || 0);
-  }, 0);
+  // Regular meal plan (toggled on/off)
+  const mealPlanCals = (nut.meals || []).reduce((sum, i) => sum + (MEAL_PLAN[i]?.calories || 0), 0);
+  const mealPlanProtein = (nut.meals || []).reduce((sum, i) => sum + (MEAL_PLAN[i]?.protein || 0), 0);
 
-  // from custom logged meals
+  // Custom MEAL_PLAN items with quantities
+  const qtyEntries = Object.entries(nut.mealQuantities || {});
+  const qtyCals    = qtyEntries.reduce((sum, [i, q]) => sum + (MEAL_PLAN[i]?.calories || 0) * q, 0);
+  const qtyProtein = qtyEntries.reduce((sum, [i, q]) => sum + (MEAL_PLAN[i]?.protein  || 0) * q, 0);
+
+  // Manually logged custom meals
   const customCals    = (nut.customMeals || []).reduce((sum, m) => sum + (m.calories || 0), 0);
   const customProtein = (nut.customMeals || []).reduce((sum, m) => sum + (m.protein  || 0), 0);
 
-  nut.calories = mealPlanCals + customCals;
-  nut.protein  = mealPlanProtein + customProtein;
+  nut.calories = mealPlanCals + qtyCals + customCals;
+  nut.protein  = mealPlanProtein + qtyProtein + customProtein;
   nut.burned   = calcBurned();
 }
 
-// function saveDailySnapshot() {
-//   const todayKey = today();
-//   const nut = state.nutrition[todayKey];
-//   if (!nut) return;
-//   // Store a permanent snapshot that recalcNutrition won't overwrite
-//   if (!state.dailySnapshots) state.dailySnapshots = {};
-//   state.dailySnapshots[todayKey] = {
-//     protein:  nut.protein,
-//     calories: nut.calories,
-//     burned:   nut.burned,
-//     net:      nut.calories - nut.burned,
-//     date:     todayKey
-//   };
-// }
 
 function saveDailySnapshot() {
   const todayKey = today();
