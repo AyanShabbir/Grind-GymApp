@@ -874,7 +874,7 @@ function renderMeals() {
       </div>`;
     }
 
-    const qty = nut.mealQuantities?.[i] || 0;
+    
     const logged = qty > 0;
     return `<div class="meal-card" style="margin-bottom:10px">
       <div class="meal-card-header">
