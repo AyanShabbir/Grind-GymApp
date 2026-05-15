@@ -1302,24 +1302,24 @@ async function init() {
   });
 
   // Fix nutrition arrays corrupted by Firestore
-Object.values(state.nutrition).forEach(nut => {
-  if (nut.meals && !Array.isArray(nut.meals)) {
-    nut.meals = Object.values(nut.meals);
-  }
-  if (nut.customMeals && !Array.isArray(nut.customMeals)) {
-    nut.customMeals = Object.values(nut.customMeals);
-  }
-});
+// Object.values(state.nutrition).forEach(nut => {
+//   if (nut.meals && !Array.isArray(nut.meals)) {
+//     nut.meals = Object.values(nut.meals);
+//   }
+//   if (nut.customMeals && !Array.isArray(nut.customMeals)) {
+//     nut.customMeals = Object.values(nut.customMeals);
+//   }
+// });
 
-  // Snapshot yesterday's nutrition on app open (catches end-of-day)
-const yesterday = dateKey(-1);
-if (state.nutrition[yesterday] && (!state.dailySnapshots?.[yesterday])) {
-  saveDailySnapshot_for(yesterday);
-}
+//   // Snapshot yesterday's nutrition on app open (catches end-of-day)
+// const yesterday = dateKey(-1);
+// if (state.nutrition[yesterday] && (!state.dailySnapshots?.[yesterday])) {
+//   saveDailySnapshot_for(yesterday);
+// }
 
 
 
-  renderHome();
-}
+//   renderHome();
+// }
 
 init();
