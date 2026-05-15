@@ -1287,19 +1287,19 @@ async function init() {
 }
   
   // Fix: convert any exercise set objects back to arrays after loading
-  Object.values(state.logs).forEach(log => {
-    if (!log.exercises) return;
-    Object.keys(log.exercises).forEach(exId => {
-      const sets = log.exercises[exId];
-      if (!Array.isArray(sets)) {
-        // Firestore turned the array into an object — convert it back
-        const max = Math.max(...Object.keys(sets).map(Number));
-        const arr = [];
-        for (let i = 0; i <= max; i++) arr[i] = sets[i] || null;
-        log.exercises[exId] = arr;
-      }
-    });
-  });
+  // Object.values(state.logs).forEach(log => {
+  //   if (!log.exercises) return;
+  //   Object.keys(log.exercises).forEach(exId => {
+  //     const sets = log.exercises[exId];
+  //     if (!Array.isArray(sets)) {
+  //       // Firestore turned the array into an object — convert it back
+  //       const max = Math.max(...Object.keys(sets).map(Number));
+  //       const arr = [];
+  //       for (let i = 0; i <= max; i++) arr[i] = sets[i] || null;
+  //       log.exercises[exId] = arr;
+  //     }
+  //   });
+  // });
 
   // Fix nutrition arrays corrupted by Firestore
 // Object.values(state.nutrition).forEach(nut => {
