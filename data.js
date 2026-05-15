@@ -186,11 +186,11 @@ export const MEAL_PLAN = [
   {
     time: "After Work · Pre Gym",
     name: "Pre-Gym Fuel",
-    calories: 400,
+    calories: 415,
     icon: "",
     items: ["50g Oats", "1 Banana (mashed)", "1–2 Dates"],
-    protein: 6,
-    note: "60–90 min before gym. ~400 kcal | ~6g protein"
+    protein: 12,
+    note: "60–90 min before gym. ~415 kcal | ~12g protein"
   },
   {
     time: "Post Gym",
