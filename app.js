@@ -9,6 +9,7 @@ const DAY_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const STATE_DOC = doc(db, 'users', 'default'); // swap 'default' for uid when you add auth
 
 let state = defaultState();
+let stateLoaded = false;
 let workoutTimer = null;
 let workoutStart = null;
 let workoutElapsed = 0;
@@ -47,15 +48,32 @@ async function loadFromFirebase() {
     const snap = await getDoc(STATE_DOC);
     if (snap.exists()) {
       const saved = snap.data();
-      // Inject workoutPlan if missing (same guard as before)
       if (!saved.workoutPlan) {
         saved.workoutPlan = JSON.parse(JSON.stringify(WORKOUT_PLAN));
       }
       state = saved;
+
+      // Fix: convert any exercise set objects back to arrays after loading
+      Object.values(state.logs).forEach(log => {
+        if (!log.exercises) return;
+        Object.keys(log.exercises).forEach(exId => {
+          const sets = log.exercises[exId];
+          if (!Array.isArray(sets)) {
+            const max = Math.max(...Object.keys(sets).map(Number));
+            const arr = [];
+            for (let i = 0; i <= max; i++) arr[i] = sets[i] || null;
+            log.exercises[exId] = arr;
+          }
+        });
+      });
+
+      stateLoaded = true;
     }
-    // If no doc exists yet, state stays as defaultState()
   } catch (err) {
-    console.error('Firebase load failed, falling back to default state:', err);
+    console.error('Firebase load failed:', err);
+    stateLoaded = false;
+    showToast('Connection error — please refresh before logging anything', 'error');
+    return;
   }
 }
 
@@ -109,6 +127,10 @@ window.confirmQty = confirmQty;
 window.closeQtyModal = closeQtyModal;
 
 async function save() {
+  if (!stateLoaded) {
+    showToast('Cannot save — reload the app first', 'error');
+    return;
+  }
   try {
     // Ensure all nutrition arrays are clean dense arrays before saving
     Object.values(state.nutrition).forEach(nut => {
@@ -1156,16 +1178,21 @@ window.saveEditEx  = saveEditEx;
 window.deleteEditEx = deleteEditEx;
 window.closeEditEx = closeEditEx;
 
-// ── INIT — load from Firebase first, then render ──
+
 // async function init() {
-//   // Show a loading indicator while fetching from Firestore
 //   document.getElementById('greeting-text').textContent = 'Loading...';
 //   await loadFromFirebase();
-//   renderHome();
-// }
 async function init() {
   document.getElementById('greeting-text').textContent = 'Loading...';
+  document.body.style.pointerEvents = 'none';
   await loadFromFirebase();
+  document.body.style.pointerEvents = '';
+  if (stateLoaded) {
+    renderHome();
+  } else {
+    document.getElementById('greeting-text').textContent = 'Failed to load — please refresh';
+  }
+}
   
   // Fix: convert any exercise set objects back to arrays after loading
   Object.values(state.logs).forEach(log => {
