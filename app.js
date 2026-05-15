@@ -1206,7 +1206,7 @@ window.toggleExCard = toggleExCard;
 window.updateSet = updateSet;
 window.toggleSetDone = toggleSetDone;
 window.skipRest = skipRest;
-window.toggleMeal = toggleMeal;
+// window.toggleMeal = toggleMeal;
 window.renderProgressChart = renderProgressChart;
 
 // ── EXERCISE EDITOR ──
