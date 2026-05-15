@@ -874,7 +874,8 @@ function renderMeals() {
       </div>`;
     }
 
-    const logged = nut.meals.includes(i);
+    const qty = nut.mealQuantities?.[i] || 0;
+    const logged = qty > 0;
     return `<div class="meal-card" style="margin-bottom:10px">
       <div class="meal-card-header">
         <div class="meal-icon-wrap">${meal.icon}</div>
@@ -884,7 +885,7 @@ function renderMeals() {
           <div class="meal-card-protein">~${meal.protein}g protein</div>
         </div>
         <button class="meal-log-btn ${logged ? 'logged' : ''}" onclick="openQtyModal(${i})">
-          ${logged ? 'Logged ✓' : 'Log'}
+          ${logged ? `${qty}× ✓` : 'Log'}
         </button>
       </div>
       <div class="meal-items-list">
@@ -898,22 +899,22 @@ function renderMeals() {
   document.getElementById('cal-burned-display').textContent = nut.burned.toLocaleString();
 }
 
-async function toggleMeal(idx) {
-  const todayKey = today();
-  const nut = state.nutrition[todayKey];
-  const meal = MEAL_PLAN[idx];
+// async function toggleMeal(idx) {
+//   const todayKey = today();
+//   const nut = state.nutrition[todayKey];
+//   const meal = MEAL_PLAN[idx];
 
-  if (nut.meals.includes(idx)) {
-    nut.meals = nut.meals.filter(i => i !== idx);
-    nut.protein = Math.max(0, nut.protein - meal.protein);
-  } else {
-    nut.meals.push(idx);
-    nut.protein += meal.protein;
-  }
+//   if (nut.meals.includes(idx)) {
+//     nut.meals = nut.meals.filter(i => i !== idx);
+//     nut.protein = Math.max(0, nut.protein - meal.protein);
+//   } else {
+//     nut.meals.push(idx);
+//     nut.protein += meal.protein;
+//   }
 
-  await save();
-  renderMeals();
-}
+//   await save();
+//   renderMeals();
+// }
 
 // function calcBurned() {
 //   const todayKey = today();
@@ -950,25 +951,27 @@ function calcBurned() {
   return Math.round(bikeKcal + treadmillKcal + liftingKcal);
 }
 
+
 // function recalcNutrition() {
 //   const todayKey = today();
 //   if (!state.nutrition[todayKey]) return;
 //   const nut = state.nutrition[todayKey];
 
-//   // from preset meal plan
-//   const mealPlanCals = (nut.meals || []).reduce((sum, i) => {
-//     return sum + (MEAL_PLAN[i]?.calories || 0);
-//   }, 0);
-//   const mealPlanProtein = (nut.meals || []).reduce((sum, i) => {
-//     return sum + (MEAL_PLAN[i]?.protein || 0);
-//   }, 0);
+//   // Regular meal plan (toggled on/off)
+//   const mealPlanCals = (nut.meals || []).reduce((sum, i) => sum + (MEAL_PLAN[i]?.calories || 0), 0);
+//   const mealPlanProtein = (nut.meals || []).reduce((sum, i) => sum + (MEAL_PLAN[i]?.protein || 0), 0);
 
-//   // from custom logged meals
+//   // Custom MEAL_PLAN items with quantities
+//   const qtyEntries = Object.entries(nut.mealQuantities || {});
+//   const qtyCals    = qtyEntries.reduce((sum, [i, q]) => sum + (MEAL_PLAN[i]?.calories || 0) * q, 0);
+//   const qtyProtein = qtyEntries.reduce((sum, [i, q]) => sum + (MEAL_PLAN[i]?.protein  || 0) * q, 0);
+
+//   // Manually logged custom meals
 //   const customCals    = (nut.customMeals || []).reduce((sum, m) => sum + (m.calories || 0), 0);
 //   const customProtein = (nut.customMeals || []).reduce((sum, m) => sum + (m.protein  || 0), 0);
 
-//   nut.calories = mealPlanCals + customCals;
-//   nut.protein  = mealPlanProtein + customProtein;
+//   nut.calories = mealPlanCals + qtyCals + customCals;
+//   nut.protein  = mealPlanProtein + qtyProtein + customProtein;
 //   nut.burned   = calcBurned();
 // }
 
@@ -977,24 +980,19 @@ function recalcNutrition() {
   if (!state.nutrition[todayKey]) return;
   const nut = state.nutrition[todayKey];
 
-  // Regular meal plan (toggled on/off)
-  const mealPlanCals = (nut.meals || []).reduce((sum, i) => sum + (MEAL_PLAN[i]?.calories || 0), 0);
-  const mealPlanProtein = (nut.meals || []).reduce((sum, i) => sum + (MEAL_PLAN[i]?.protein || 0), 0);
-
-  // Custom MEAL_PLAN items with quantities
+  // Preset meals via quantity selector
   const qtyEntries = Object.entries(nut.mealQuantities || {});
   const qtyCals    = qtyEntries.reduce((sum, [i, q]) => sum + (MEAL_PLAN[i]?.calories || 0) * q, 0);
   const qtyProtein = qtyEntries.reduce((sum, [i, q]) => sum + (MEAL_PLAN[i]?.protein  || 0) * q, 0);
 
-  // Manually logged custom meals
+  // Manually added custom meals
   const customCals    = (nut.customMeals || []).reduce((sum, m) => sum + (m.calories || 0), 0);
   const customProtein = (nut.customMeals || []).reduce((sum, m) => sum + (m.protein  || 0), 0);
 
-  nut.calories = mealPlanCals + qtyCals + customCals;
-  nut.protein  = mealPlanProtein + qtyProtein + customProtein;
+  nut.calories = qtyCals + customCals;
+  nut.protein  = qtyProtein + customProtein;
   nut.burned   = calcBurned();
 }
-
 
 function saveDailySnapshot() {
   const todayKey = today();
