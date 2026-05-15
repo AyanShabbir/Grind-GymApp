@@ -67,6 +67,16 @@ async function loadFromFirebase() {
         });
       });
 
+      // Fix nutrition meals arrays too
+      Object.values(state.nutrition).forEach(nut => {
+        if (nut.meals && !Array.isArray(nut.meals)) {
+          nut.meals = Object.values(nut.meals);
+        }
+        if (nut.customMeals && !Array.isArray(nut.customMeals)) {
+          nut.customMeals = Object.values(nut.customMeals);
+        }
+      });
+
       stateLoaded = true;
     }
   } catch (err) {
@@ -721,10 +731,96 @@ function closeModal() {
 }
 
 // ── MEALS ──
+// function renderMeals() {
+//     recalcNutrition();
+//     const weightInput = document.getElementById('user-weight-input');
+//     if (weightInput) weightInput.value = state.userWeight || 80;
+//   const todayKey = today();
+//   if (!state.nutrition[todayKey]) {
+//     state.nutrition[todayKey] = { protein: 0, calories: 0, burned: 0, meals: [] };
+//   }
+//   const nut = state.nutrition[todayKey];
+
+//   const pct = Math.min((nut.protein / 160) * 100, 100);
+//   document.getElementById('protein-logged').textContent = nut.protein;
+//   document.getElementById('protein-fill').style.width = pct + '%';
+
+//   document.getElementById('meal-dots').innerHTML = MEAL_PLAN.map((m, i) => {
+//     const logged = nut.meals.includes(i);
+//     return `<div class="dpb-meal ${logged ? 'logged' : ''}">${m.icon}<br>${logged ? '✓' : '—'}</div>`;
+//   }).join('');
+
+//   document.getElementById('meal-cards').innerHTML = MEAL_PLAN.map((meal, i) => {
+//     // Custom logged meals
+//     const isCustom = meal.time === 'Custom';          // ← ADD
+//     const qty = nut.mealQuantities?.[i] || 0;         // ← ADD
+
+//   if (isCustom) {                                   // ← ADD this whole block
+//     return `<div class="meal-card" style="margin-bottom:10px">
+//       <div class="meal-card-header">
+//         <div class="meal-icon-wrap">${meal.icon || '🍽️'}</div>
+//         <div class="meal-card-info">
+//           <div class="meal-card-time">${meal.time}</div>
+//           <div class="meal-card-name">${meal.name}</div>
+//           <div class="meal-card-protein">${qty ? `${meal.protein * qty}g protein · ${meal.calories * qty} kcal` : meal.note}</div>
+//         </div>
+//         <button class="meal-log-btn ${qty ? 'logged' : ''}" onclick="openQtyModal(${i})">
+//           ${qty ? `${qty}× ✓` : 'Log'}
+//         </button>
+//       </div>
+//     </div>`;
+//   }
+// const customMeals = nut.customMeals || [];
+// const customHtml = customMeals.length ? customMeals.map((m, i) => `
+//   <div class="meal-card" style="margin-bottom:10px">
+//     <div class="meal-card-header">
+//       <div class="meal-icon-wrap">🍴</div>
+//       <div class="meal-card-info">
+//         <div class="meal-card-time">${m.time}</div>
+//         <div class="meal-card-name">${m.name}</div>
+//         <div class="meal-card-protein">${m.protein}g protein · ${m.calories} kcal</div>
+//       </div>
+//       <button class="ex-edit-btn" style="color:var(--red)" onclick="deleteCustomMeal(${i})">✕</button>
+//     </div>
+//   </div>`).join('') : '';
+
+// document.getElementById('custom-meal-cards').innerHTML = customHtml;
+//     const logged = nut.meals.includes(i);
+//     return `<div class="meal-card" style="margin-bottom:10px">
+//       <div class="meal-card-header">
+//         <div class="meal-icon-wrap">${meal.icon}</div>
+//         <div class="meal-card-info">
+//           <div class="meal-card-time">${meal.time}</div>
+//           <div class="meal-card-name">${meal.name}</div>
+//           <div class="meal-card-protein">~${meal.protein}g protein</div>
+//         </div>
+//         <button class="meal-log-btn ${logged ? 'logged' : ''}" onclick="openQtyModal(${i})">
+//           ${logged ? 'Logged ✓' : 'Log'}
+//         </button>
+//       </div>
+//       <div class="meal-items-list">
+//         ${(meal.items || []).map(item => `<div class="meal-item">${item}</div>`).join('')}
+//         <div class="meal-note-text">${meal.note}</div>
+//       </div>
+//     </div>`;
+//   }).join('');
+  
+//   // 04/17
+//   // document.getElementById('cal-intake-display').textContent = nut.calories.toLocaleString();
+//   // document.getElementById('cal-burned-display').textContent = nut.burned.toLocaleString();
+//   // const net = nut.calories - nut.burned;
+//   // const netEl = document.getElementById('cal-net-display');
+//   // netEl.textContent = net.toLocaleString();
+//   // netEl.className = `cl-sum-val ${net <= 2200 ? 'green' : 'red'}`;
+//   document.getElementById('cal-intake-display').textContent = nut.calories.toLocaleString();
+//   document.getElementById('cal-burned-display').textContent = nut.burned.toLocaleString();
+// }
+
 function renderMeals() {
-    recalcNutrition();
-    const weightInput = document.getElementById('user-weight-input');
-    if (weightInput) weightInput.value = state.userWeight || 80;
+  recalcNutrition();
+  const weightInput = document.getElementById('user-weight-input');
+  if (weightInput) weightInput.value = state.userWeight || 80;
+
   const todayKey = today();
   if (!state.nutrition[todayKey]) {
     state.nutrition[todayKey] = { protein: 0, calories: 0, burned: 0, meals: [] };
@@ -740,41 +836,44 @@ function renderMeals() {
     return `<div class="dpb-meal ${logged ? 'logged' : ''}">${m.icon}<br>${logged ? '✓' : '—'}</div>`;
   }).join('');
 
+  // Custom meals — outside the loop
+  const customMeals = nut.customMeals || [];
+  document.getElementById('custom-meal-cards').innerHTML = customMeals.length
+    ? customMeals.map((m, i) => `
+        <div class="meal-card" style="margin-bottom:10px">
+          <div class="meal-card-header">
+            <div class="meal-icon-wrap">🍴</div>
+            <div class="meal-card-info">
+              <div class="meal-card-time">${m.time}</div>
+              <div class="meal-card-name">${m.name}</div>
+              <div class="meal-card-protein">${m.protein}g protein · ${m.calories} kcal</div>
+            </div>
+            <button class="ex-edit-btn" style="color:var(--red)" onclick="deleteCustomMeal(${i})">✕</button>
+          </div>
+        </div>`).join('')
+    : '';
+
+  // Preset meals
   document.getElementById('meal-cards').innerHTML = MEAL_PLAN.map((meal, i) => {
-    // Custom logged meals
-    const isCustom = meal.time === 'Custom';          // ← ADD
-    const qty = nut.mealQuantities?.[i] || 0;         // ← ADD
+    const isCustom = meal.time === 'Custom';
+    const qty = nut.mealQuantities?.[i] || 0;
 
-  if (isCustom) {                                   // ← ADD this whole block
-    return `<div class="meal-card" style="margin-bottom:10px">
-      <div class="meal-card-header">
-        <div class="meal-icon-wrap">${meal.icon || '🍽️'}</div>
-        <div class="meal-card-info">
-          <div class="meal-card-time">${meal.time}</div>
-          <div class="meal-card-name">${meal.name}</div>
-          <div class="meal-card-protein">${qty ? `${meal.protein * qty}g protein · ${meal.calories * qty} kcal` : meal.note}</div>
+    if (isCustom) {
+      return `<div class="meal-card" style="margin-bottom:10px">
+        <div class="meal-card-header">
+          <div class="meal-icon-wrap">${meal.icon || '🍽️'}</div>
+          <div class="meal-card-info">
+            <div class="meal-card-time">${meal.time}</div>
+            <div class="meal-card-name">${meal.name}</div>
+            <div class="meal-card-protein">${qty ? `${meal.protein * qty}g protein · ${meal.calories * qty} kcal` : meal.note}</div>
+          </div>
+          <button class="meal-log-btn ${qty ? 'logged' : ''}" onclick="openQtyModal(${i})">
+            ${qty ? `${qty}× ✓` : 'Log'}
+          </button>
         </div>
-        <button class="meal-log-btn ${qty ? 'logged' : ''}" onclick="openQtyModal(${i})">
-          ${qty ? `${qty}× ✓` : 'Log'}
-        </button>
-      </div>
-    </div>`;
-  }
-const customMeals = nut.customMeals || [];
-const customHtml = customMeals.length ? customMeals.map((m, i) => `
-  <div class="meal-card" style="margin-bottom:10px">
-    <div class="meal-card-header">
-      <div class="meal-icon-wrap">🍴</div>
-      <div class="meal-card-info">
-        <div class="meal-card-time">${m.time}</div>
-        <div class="meal-card-name">${m.name}</div>
-        <div class="meal-card-protein">${m.protein}g protein · ${m.calories} kcal</div>
-      </div>
-      <button class="ex-edit-btn" style="color:var(--red)" onclick="deleteCustomMeal(${i})">✕</button>
-    </div>
-  </div>`).join('') : '';
+      </div>`;
+    }
 
-document.getElementById('custom-meal-cards').innerHTML = customHtml;
     const logged = nut.meals.includes(i);
     return `<div class="meal-card" style="margin-bottom:10px">
       <div class="meal-card-header">
@@ -794,14 +893,7 @@ document.getElementById('custom-meal-cards').innerHTML = customHtml;
       </div>
     </div>`;
   }).join('');
-  
-  // 04/17
-  // document.getElementById('cal-intake-display').textContent = nut.calories.toLocaleString();
-  // document.getElementById('cal-burned-display').textContent = nut.burned.toLocaleString();
-  // const net = nut.calories - nut.burned;
-  // const netEl = document.getElementById('cal-net-display');
-  // netEl.textContent = net.toLocaleString();
-  // netEl.className = `cl-sum-val ${net <= 2200 ? 'green' : 'red'}`;
+
   document.getElementById('cal-intake-display').textContent = nut.calories.toLocaleString();
   document.getElementById('cal-burned-display').textContent = nut.burned.toLocaleString();
 }
