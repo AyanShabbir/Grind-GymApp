@@ -184,6 +184,15 @@ export const MEAL_PLAN = [
     note: "~260 kcal | ~31g protein"
   },
   {
+    time: "Noon",
+    name: "Lean Body Shake",
+    calories: 290,
+    icon: "",
+    items: ["1 scoop", "water"],
+    protein: 35,
+    note: "~290 kcal | ~35g protein"
+  },
+  {
     time: "After Work · Pre Gym",
     name: "Pre-Gym Fuel",
     calories: 415,
