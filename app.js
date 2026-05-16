@@ -247,7 +247,7 @@ function renderHome() {
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
         <div style="font-size:12px;color:var(--muted2)">${s.date.slice(5)}</div>
         <div style="font-size:12px;font-family:'DM Mono',monospace;color:var(--accent)">${s.protein}g</div>
-        <div style="font-size:12px;font-family:'DM Mono',monospace;color:${s.calories <= 2400 ? 'var(--accent)' : 'var(--red)'}">${s.calories} kcal</div>
+        <div style="font-size:12px;font-family:'DM Mono',monospace;color:${s.calories <= 2700 ? 'var(--accent)' : 'var(--red)'}">${s.calories} kcal</div>
       </div>
     `).join('');
 }
@@ -827,7 +827,7 @@ function renderMeals() {
   }
   const nut = state.nutrition[todayKey];
 
-  const pct = Math.min((nut.protein / 160) * 100, 100);
+  const pct = Math.min((nut.protein / 185) * 100, 100);
   document.getElementById('protein-logged').textContent = nut.protein;
   document.getElementById('protein-fill').style.width = pct + '%';
 
@@ -1058,7 +1058,7 @@ function renderWeekly() {
   document.getElementById('w-protein').textContent = avgProtein + 'g';
   document.getElementById('w-time').textContent = Math.round(totalTime / 60) + 'm';
   document.getElementById('w-prs').textContent = totalPRs;
-  document.getElementById('w-calories').textContent = avgCal ? `${avgCal} / 2400` : '—';
+  document.getElementById('w-calories').textContent = avgCal ? `${avgCal} / 2700` : '—';
   document.getElementById('w-best-protein').textContent = bestProtein ? bestProtein + 'g' : '—';
   document.getElementById('w-worst-protein').textContent = (worstProtein < 999 && worstProtein > 0) ? worstProtein + 'g' : '—';
   document.getElementById('w-avg-calories').textContent = avgCal ? avgCal.toLocaleString() : '—';
