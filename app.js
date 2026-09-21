@@ -1,6 +1,6 @@
 import { WORKOUT_PLAN, MEAL_PLAN } from './data.js';
 import { db } from './firebase.js';
-import { doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { doc, getDoc, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ── STATE ──
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -10,12 +10,21 @@ const STATE_DOC = doc(db, 'users', 'default'); // swap 'default' for uid when yo
 
 let state = defaultState();
 let stateLoaded = false;
+let planDirty = false;
+let saveChain = Promise.resolve();
+let saveTimer = null;
+const LS_TIMER = 'grind_workout_timer';
+const LS_REST = 'grind_rest_timer';
+const LS_DRAFT = 'grind_draft_log';
 let workoutTimer = null;
 let workoutStart = null;
 let workoutElapsed = 0;
 let isWorkoutRunning = false;
 let restTimer = null;
 let restRemaining = 0;
+let restEndAt = 0;
+let restTick = null;
+const REST_SECONDS = 60;
 let currentRestEl = null;
 let activeExerciseId = null;
 let _qtyMealIdx = null;
@@ -32,7 +41,7 @@ function defaultState() {
 }
 
 async function saveUserWeight() {
-  const w = parseInt(document.getElementById('user-weight-input').value);
+  const w = parseFloat(document.getElementById('user-weight-input').value);
   if (!w || w < 30 || w > 250) { showToast('Enter a valid weight', ''); return; }
   state.userWeight = w;
   recalcNutrition();
@@ -77,8 +86,12 @@ async function loadFromFirebase() {
         }
       });
 
-      stateLoaded = true;
+      mergeDraft();
+    } else {
+      // No document yet (first run) — start fresh instead of blocking saves forever
+      await setDoc(STATE_DOC, cleanForFirestore(state));
     }
+    stateLoaded = true;
   } catch (err) {
     console.error('Firebase load failed:', err);
     stateLoaded = false;
@@ -136,13 +149,62 @@ window.changeQtyModal = changeQtyModal;
 window.confirmQty = confirmQty;
 window.closeQtyModal = closeQtyModal;
 
-async function save() {
+function escapeHtml(v) {
+  return String(v ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+// Debounced save for high-frequency edits (typing in set inputs)
+function scheduleSave() {
+  backupDraft();
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { saveTimer = null; save(); }, 700);
+}
+
+function flushSave() {
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; save(); }
+}
+
+// Local copy of today's log so nothing typed is lost if the app is killed before Firestore confirms
+function backupDraft() {
+  try {
+    const k = today();
+    localStorage.setItem(LS_DRAFT, JSON.stringify({ date: k, log: state.logs[k] || null }));
+  } catch (e) {}
+}
+
+function mergeDraft() {
+  try {
+    const d = JSON.parse(localStorage.getItem(LS_DRAFT) || 'null');
+    if (!d || d.date !== today() || !d.log) return;
+    if (!state.logs) state.logs = {};
+    const cur = state.logs[d.date] || (state.logs[d.date] = { workoutDone: false, duration: 0, sets: 0, exercises: {}, prs: [] });
+    if (!cur.exercises) cur.exercises = {};
+    Object.entries(d.log.exercises || {}).forEach(([exId, sets]) => {
+      const dsets = Array.isArray(sets) ? sets : Object.values(sets || {});
+      const csets = cur.exercises[exId] || (cur.exercises[exId] = []);
+      dsets.forEach((ds, i) => {
+        if (!ds) return;
+        const cs = csets[i] || (csets[i] = {});
+        ['weight', 'reps'].forEach(f => { if (cs[f] == null && ds[f]) cs[f] = ds[f]; });
+        if (ds.done && !cs.done) cs.done = true;
+      });
+    });
+  } catch (e) {}
+}
+
+// Writes are serialized and only touch today's entries, so an old tab/device
+// can't overwrite history it never loaded.
+function save() {
+  saveChain = saveChain.then(doSave, doSave);
+  return saveChain;
+}
+
+async function doSave() {
   if (!stateLoaded) {
     showToast('Cannot save — reload the app first', 'error');
     return;
   }
   try {
-    // Ensure all nutrition arrays are clean dense arrays before saving
     Object.values(state.nutrition).forEach(nut => {
       if (nut.meals) nut.meals = Array.isArray(nut.meals)
         ? nut.meals.filter(x => x != null)
@@ -152,7 +214,15 @@ async function save() {
         : Object.values(nut.customMeals);
     });
     saveDailySnapshot();
-    await setDoc(STATE_DOC, cleanForFirestore(state));
+    const k = today();
+    const clean = cleanForFirestore(state);
+    const patch = { bests: clean.bests || {}, userWeight: clean.userWeight };
+    if (clean.logs?.[k]) patch[`logs.${k}`] = clean.logs[k];
+    if (clean.nutrition?.[k]) patch[`nutrition.${k}`] = clean.nutrition[k];
+    if (clean.dailySnapshots?.[k]) patch[`dailySnapshots.${k}`] = clean.dailySnapshots[k];
+    if (planDirty) patch.workoutPlan = clean.workoutPlan;
+    await updateDoc(STATE_DOC, patch);
+    planDirty = false;
   } catch (err) {
     console.error('Firebase save failed:', err);
     showToast('Save failed — check connection', 'error');
@@ -315,7 +385,7 @@ function renderWorkout() {
   }
 
   document.getElementById('workout-day-name').textContent = plan.name;
-  document.getElementById('workout-day-info').innerHTML = `<strong id="workout-day-name">${plan.name}</strong> — ${plan.muscles}`;
+  document.getElementById('workout-day-info').innerHTML = `<strong id="workout-day-name">${escapeHtml(plan.name)}</strong> — ${escapeHtml(plan.muscles)}`;
 
   const list = document.getElementById('exercise-list');
   if (plan.type === 'rest') {
@@ -349,6 +419,7 @@ function renderWorkout() {
       </div>
       <button class="cl-add-btn" style="align-self:flex-end" onclick="saveCardio()">Log</button>
     </div>`;
+  resumeRest();
 }
 
 async function saveCardio() {
@@ -359,8 +430,8 @@ async function saveCardio() {
   const treadmill = parseInt(document.getElementById('cardio-treadmill-input').value) || 0;
   
   state.logs[todayKey].cardioMinutes = { bike, treadmill };
-  await save();
   recalcNutrition();
+  await save();
   showToast('Cardio logged!', 'success');
 }
 window.saveCardio = saveCardio;
@@ -432,13 +503,14 @@ function getLastLog(exId) {
 
 function renderExerciseCard(ex, idx, todayKey) {
   const log = state.logs[todayKey]?.exercises?.[ex.id] || [];
-  const allDone = log.length >= ex.sets && log.every(s => s.done);
+  const allDone = log.length >= ex.sets && log.every(s => s?.done);
   const best = state.bests[ex.id];
 
   const setsHtml = Array.from({ length: ex.sets }, (_, i) => {
     // const setLog = log[i] || {};
-    const last = !log.length ? getLastLog(ex.id) : null;
     const setLog = log[i] || {};
+    // Prefill per set: only fall back to the last session when this set has nothing of its own
+    const last = (setLog.weight && setLog.reps) ? null : getLastLog(ex.id);
     const prefillWeight = setLog.weight || last?.weight || '';
     const prefillReps   = setLog.reps   || last?.reps   || '';
     const isDone = setLog.done;
@@ -462,9 +534,9 @@ function renderExerciseCard(ex, idx, todayKey) {
       <div class="ex-info">
         <div class="ex-name-row">
           <div class="ex-type-dot ${ex.type}"></div>
-          <div class="ex-card-name">${ex.name}</div>
+          <div class="ex-card-name">${escapeHtml(ex.name)}</div>
         </div>
-        ${ex.notes ? `<div class="ex-card-note">${ex.notes}</div>` : ''}
+        ${ex.notes ? `<div class="ex-card-note">${escapeHtml(ex.notes)}</div>` : ''}
       </div>
       <div class="ex-target">
         <strong>${ex.sets}×${ex.reps}</strong>
@@ -503,8 +575,10 @@ async function updateSet(exId, setIdx, field, value) {
   if (!state.logs[todayKey]) state.logs[todayKey] = { workoutDone: false, duration: 0, sets: 0, exercises: {}, prs: [] };
   if (!state.logs[todayKey].exercises[exId]) state.logs[todayKey].exercises[exId] = [];
   if (!state.logs[todayKey].exercises[exId][setIdx]) state.logs[todayKey].exercises[exId][setIdx] = {};
-  state.logs[todayKey].exercises[exId][setIdx][field] = parseFloat(value) || 0;
-  await save();
+  const num = parseFloat(value);
+  if (num > 0) state.logs[todayKey].exercises[exId][setIdx][field] = num;
+  else delete state.logs[todayKey].exercises[exId][setIdx][field];
+  scheduleSave();
 }
 
 // async function toggleSetDone(exId, setIdx) {
@@ -592,15 +666,18 @@ async function checkPR(exId, weight, reps) {
     const wasPR = !!best;
     state.bests[exId] = { weight, reps, date: today() };
     const todayLog = state.logs[today()];
-    if (wasPR && !todayLog.prs.includes(exId)) {
+    if (wasPR && todayLog) {
+      if (!todayLog.prs) todayLog.prs = [];
+      if (!todayLog.prs.includes(exId)) {
       todayLog.prs.push(exId);
       showToast('🏆 New PR!', 'success');
+      }
     }
     await save();
   }
 }
 
-function startRestTimer(exId) {
+function startRestTimer(exId, endAt) {
   if (restTimer) { clearInterval(restTimer); restTimer = null; }
   if (currentRestEl) document.getElementById(`rest-${currentRestEl}`)?.style.setProperty('display', 'none');
 
@@ -609,22 +686,35 @@ function startRestTimer(exId) {
   if (!restEl || !restTimeEl) return;
 
   currentRestEl = exId;
-  restRemaining = 60;
+  // Track an absolute end time so the countdown survives the app being backgrounded
+  restEndAt = endAt || Date.now() + REST_SECONDS * 1000;
+  try { localStorage.setItem(LS_REST, JSON.stringify({ exId, endAt: restEndAt, date: today() })); } catch (e) {}
   restEl.style.display = 'flex';
   restEl.classList.add('active');
-  updateRestDisplay(restTimeEl, restRemaining);
 
-  restTimer = setInterval(() => {
-    restRemaining--;
+  const tick = () => {
+    restRemaining = Math.max(0, Math.ceil((restEndAt - Date.now()) / 1000));
     updateRestDisplay(restTimeEl, restRemaining);
     if (restRemaining <= 0) {
       clearInterval(restTimer);
       restTimer = null;
       restEl.classList.remove('active');
       restTimeEl.textContent = 'Done!';
+      try { localStorage.removeItem(LS_REST); } catch (e) {}
       showToast('Rest done — next set!', 'success');
     }
-  }, 1000);
+  };
+  restTick = tick;
+  tick();
+  if (restRemaining > 0) restTimer = setInterval(tick, 1000);
+}
+
+function resumeRest() {
+  try {
+    const r = JSON.parse(localStorage.getItem(LS_REST) || 'null');
+    if (!r || r.date !== today() || r.endAt <= Date.now()) { localStorage.removeItem(LS_REST); return; }
+    startRestTimer(r.exId, r.endAt);
+  } catch (e) {}
 }
 
 function updateRestDisplay(el, secs) {
@@ -638,6 +728,7 @@ function skipRest(exId) {
   const restEl = document.getElementById(`rest-${exId}`);
   if (restEl) { restEl.classList.remove('active'); restEl.style.display = 'none'; }
   currentRestEl = null;
+  try { localStorage.removeItem(LS_REST); } catch (e) {}
 }
 
 // ── WORKOUT TIMER ──
@@ -658,23 +749,46 @@ function toggleWorkout() {
 // }
 
 // Auto save every 30 sec update 04/13
+function persistTimer() {
+  try {
+    if (!isWorkoutRunning && workoutElapsed === 0) { localStorage.removeItem(LS_TIMER); return; }
+    localStorage.setItem(LS_TIMER, JSON.stringify({ date: today(), running: isWorkoutRunning, start: workoutStart, elapsed: workoutElapsed }));
+  } catch (e) {}
+}
+
+function restoreTimer() {
+  try {
+    const t = JSON.parse(localStorage.getItem(LS_TIMER) || 'null');
+    if (!t || t.date !== today() || state.logs[today()]?.workoutDone) { localStorage.removeItem(LS_TIMER); return; }
+    workoutElapsed = t.running ? Math.floor((Date.now() - t.start) / 1000) : t.elapsed;
+    const el = document.getElementById('workout-elapsed');
+    el.textContent = formatTime(workoutElapsed);
+    el.classList.remove('inactive');
+    if (t.running) startWorkout(); else updateWorkoutBtn();
+  } catch (e) {}
+}
+
 function startWorkout() {
+  if (workoutTimer) clearInterval(workoutTimer);
   isWorkoutRunning = true;
   workoutStart = Date.now() - workoutElapsed * 1000;
   const elapsedEl = document.getElementById('workout-elapsed');
   elapsedEl.classList.remove('inactive');
+  persistTimer();
   workoutTimer = setInterval(() => {
     workoutElapsed = Math.floor((Date.now() - workoutStart) / 1000);
     elapsedEl.textContent = formatTime(workoutElapsed);
     // Auto-save every 30 seconds
-    if (workoutElapsed % 30 === 0) save();
+    if (workoutElapsed % 30 === 0) { save(); persistTimer(); }
   }, 1000);
   updateWorkoutBtn();
 }
 
 function pauseWorkout() {
+  if (isWorkoutRunning && workoutStart) workoutElapsed = Math.floor((Date.now() - workoutStart) / 1000);
   isWorkoutRunning = false;
   clearInterval(workoutTimer);
+  persistTimer();
   updateWorkoutBtn();
 }
 
@@ -715,6 +829,7 @@ async function saveWorkout() {
   state.logs[todayKey].duration = workoutElapsed;
   workoutElapsed = 0;
   isWorkoutRunning = false;
+  persistTimer();
   document.getElementById('workout-elapsed').textContent = '00:00';
   document.getElementById('workout-elapsed').classList.add('inactive');
   updateWorkoutBtn();
@@ -844,8 +959,8 @@ function renderMeals() {
           <div class="meal-card-header">
             <div class="meal-icon-wrap">🍴</div>
             <div class="meal-card-info">
-              <div class="meal-card-time">${m.time}</div>
-              <div class="meal-card-name">${m.name}</div>
+              <div class="meal-card-time">${escapeHtml(m.time)}</div>
+              <div class="meal-card-name">${escapeHtml(m.name)}</div>
               <div class="meal-card-protein">${m.protein}g protein · ${m.calories} kcal</div>
             </div>
             <button class="ex-edit-btn" style="color:var(--red)" onclick="deleteCustomMeal(${i})">✕</button>
@@ -1092,7 +1207,7 @@ function renderProgressSelector() {
   const sel = document.getElementById('progress-ex-select');
   const allExercises = Object.values(state.workoutPlan).flatMap(d => d.exercises || []);
   sel.innerHTML = allExercises.map(ex =>
-    `<option value="${ex.id}">${ex.name}</option>`
+    `<option value="${escapeHtml(ex.id)}">${escapeHtml(ex.name)}</option>`
   ).join('');
 }
 
@@ -1173,6 +1288,7 @@ async function saveAddEx() {
   };
 
   plan.exercises.push(newEx);
+  planDirty = true;
   await save();
   closeAddEx();
   renderWorkout();
@@ -1241,6 +1357,7 @@ async function saveEditEx() {
   ex.reps  = document.getElementById('edit-ex-reps').value.trim() || ex.reps;
   ex.notes = document.getElementById('edit-ex-notes').value.trim();
 
+  planDirty = true;
   await save();
   closeEditEx();
   renderWorkout();
@@ -1253,6 +1370,7 @@ async function deleteEditEx() {
   const exId = document.getElementById('edit-ex-id').value;
   plan.exercises = plan.exercises.filter(e => e.id !== exId);
 
+  planDirty = true;
   await save();
   closeEditEx();
   renderWorkout();
@@ -1278,6 +1396,7 @@ async function init() {
   await loadFromFirebase();
   document.body.style.pointerEvents = '';
   if (stateLoaded) {
+    restoreTimer();
     renderHome();
   } else {
     document.getElementById('greeting-text').textContent = 'Failed to load — please refresh';
@@ -1319,5 +1438,20 @@ async function init() {
 
 //   renderHome();
 // }
+
+// Coming back from the background: catch timers up and push any pending edits
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    flushSave();
+    persistTimer();
+  } else {
+    if (isWorkoutRunning) {
+      workoutElapsed = Math.floor((Date.now() - workoutStart) / 1000);
+      document.getElementById('workout-elapsed').textContent = formatTime(workoutElapsed);
+    }
+    if (restEndAt && restTick) restTick();
+  }
+});
+window.addEventListener('pagehide', () => { flushSave(); persistTimer(); });
 
 init();
