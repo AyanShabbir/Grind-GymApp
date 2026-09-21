@@ -490,16 +490,19 @@ window.saveAddMeal    = saveAddMeal;
 window.deleteCustomMeal = deleteCustomMeal;
 window.closeAddMeal   = closeAddMeal;
 
-// Look back up to 30 days for last logged weight/reps for this exercise 04/13
+// Most recent logged weight/reps for this exercise — searches all history, newest first,
+// then falls back to the stored personal best
 function getLastLog(exId) {
-  for (let d = 1; d <= 30; d++) {
-    const dk = dateKey(-d);
+  const todayKey = today();
+  const dates = Object.keys(state.logs || {}).filter(d => d < todayKey).sort().reverse();
+  for (const dk of dates) {
     const sets = state.logs[dk]?.exercises?.[exId];
     if (!sets) continue;
     const done = (Array.isArray(sets) ? sets : Object.values(sets)).filter(s => s?.done && s.weight);
     if (done.length) return done[done.length - 1];
   }
-  return null;
+  const best = state.bests?.[exId];
+  return best?.weight ? { weight: best.weight, reps: best.reps } : null;
 }
 
 function renderExerciseCard(ex, idx, todayKey) {
