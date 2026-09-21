@@ -1,5 +1,6 @@
 import { WORKOUT_PLAN, MEAL_PLAN } from './data.js';
-import { db } from './firebase.js';
+import { db, auth } from './firebase.js';
+import { onAuthStateChanged, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { doc, getDoc, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ── STATE ──
@@ -1387,11 +1388,35 @@ window.deleteEditEx = deleteEditEx;
 window.closeEditEx = closeEditEx;
 
 
-// async function init() {
-//   document.getElementById('greeting-text').textContent = 'Loading...';
-//   await loadFromFirebase();
+function waitForAuth() {
+  return new Promise(resolve => {
+    const unsub = onAuthStateChanged(auth, user => { unsub(); resolve(user); });
+  });
+}
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pw = document.getElementById('login-password').value;
+  const err = document.getElementById('login-error');
+  err.textContent = '';
+  try {
+    await signInWithEmailAndPassword(auth, email, pw);
+    document.getElementById('login-modal').classList.remove('open');
+    await init();
+  } catch (e) {
+    err.textContent = 'Sign-in failed — check email and password';
+  }
+}
+window.doLogin = doLogin;
+
 async function init() {
   document.getElementById('greeting-text').textContent = 'Loading...';
+  const user = auth.currentUser || await waitForAuth();
+  if (!user) {
+    document.getElementById('greeting-text').textContent = 'Sign in to continue';
+    document.getElementById('login-modal').classList.add('open');
+    return;
+  }
   document.body.style.pointerEvents = 'none';
   await loadFromFirebase();
   document.body.style.pointerEvents = '';
@@ -1402,42 +1427,6 @@ async function init() {
     document.getElementById('greeting-text').textContent = 'Failed to load — please refresh';
   }
 }
-  
-  // Fix: convert any exercise set objects back to arrays after loading
-  // Object.values(state.logs).forEach(log => {
-  //   if (!log.exercises) return;
-  //   Object.keys(log.exercises).forEach(exId => {
-  //     const sets = log.exercises[exId];
-  //     if (!Array.isArray(sets)) {
-  //       // Firestore turned the array into an object — convert it back
-  //       const max = Math.max(...Object.keys(sets).map(Number));
-  //       const arr = [];
-  //       for (let i = 0; i <= max; i++) arr[i] = sets[i] || null;
-  //       log.exercises[exId] = arr;
-  //     }
-  //   });
-  // });
-
-  // Fix nutrition arrays corrupted by Firestore
-// Object.values(state.nutrition).forEach(nut => {
-//   if (nut.meals && !Array.isArray(nut.meals)) {
-//     nut.meals = Object.values(nut.meals);
-//   }
-//   if (nut.customMeals && !Array.isArray(nut.customMeals)) {
-//     nut.customMeals = Object.values(nut.customMeals);
-//   }
-// });
-
-//   // Snapshot yesterday's nutrition on app open (catches end-of-day)
-// const yesterday = dateKey(-1);
-// if (state.nutrition[yesterday] && (!state.dailySnapshots?.[yesterday])) {
-//   saveDailySnapshot_for(yesterday);
-// }
-
-
-
-//   renderHome();
-// }
 
 // Coming back from the background: catch timers up and push any pending edits
 document.addEventListener('visibilitychange', () => {
