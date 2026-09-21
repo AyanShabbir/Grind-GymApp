@@ -1233,6 +1233,17 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="login-modal" style="z-index:9999">
+  <div class="modal" style="padding:24px">
+    <h2 style="margin-bottom:6px">Sign in</h2>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:16px">This app's data is private to you.</div>
+    <input class="set-input" type="email" id="login-email" placeholder="Email" autocomplete="username" style="width:100%;margin-bottom:10px" />
+    <input class="set-input" type="password" id="login-password" placeholder="Password" autocomplete="current-password" style="width:100%;margin-bottom:10px" />
+    <div id="login-error" style="font-size:12px;color:var(--red);min-height:16px;margin-bottom:10px"></div>
+    <button class="start-workout-btn" onclick="doLogin()">Sign in</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- <script type="importmap">
