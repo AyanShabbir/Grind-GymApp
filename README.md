@@ -24,7 +24,14 @@ A single-user PWA for tracking a Push/Pull/Legs routine, meals and calories. Sta
 - One Firestore document: `users/default` (logs, nutrition, bests, daily snapshots, workout plan, body weight).
 - Writes only touch today's entries (`updateDoc` with field paths), so an old tab or device can't overwrite past history.
 - Set inputs are saved after a short debounce and also on app background / page hide. A local copy of today's log is kept in `localStorage` as a safety net.
-- Firestore documents are limited to 1 MB, so very old history will eventually need archiving.
+- Firestore documents are limited to 1 MB, so old days can be moved to `users/default/archive/YYYY-MM` (see below).
+
+## Archiving old data
+Days older than 75 days can be moved out of the main document. It only runs when asked, via the URL:
+1. Add the archive rule above in Firestore (needed once).
+2. Open the app at `/?archive=copy` — copies old months to the archive and verifies each one by reading it back. Nothing is removed.
+3. Once that reports success, open `/?archive=move` — repeats the verified copy, then asks to confirm before removing those days from the main document. If any check fails, nothing is removed.
+Run it every few months. The app itself only reads recent days plus your saved bests, so archived data doesn't affect the screens.
 
 ## Sign-in and security
 The app requires Firebase email/password sign-in. Firestore rules must only allow your own account:
@@ -34,6 +41,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/default {
+      allow read, write: if request.auth != null
+                         && request.auth.uid == 'YOUR_UID';
+    }
+    match /users/default/archive/{month} {
       allow read, write: if request.auth != null
                          && request.auth.uid == 'YOUR_UID';
     }

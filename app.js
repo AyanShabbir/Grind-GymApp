@@ -1,7 +1,7 @@
 import { WORKOUT_PLAN, MEAL_PLAN } from './data.js';
 import { db, auth } from './firebase.js';
 import { onAuthStateChanged, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import { doc, getDoc, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { doc, getDoc, setDoc, updateDoc, deleteField } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ── STATE ──
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -1191,6 +1191,84 @@ window.saveEditEx  = saveEditEx;
 window.deleteEditEx = deleteEditEx;
 window.closeEditEx = closeEditEx;
 
+// ── ARCHIVE ──
+// Keeps the main document small (Firestore caps documents at 1 MB) by moving old days into
+// users/default/archive/YYYY-MM. Only runs when the app is opened with ?archive=copy or
+// ?archive=move. "copy" writes and verifies; "move" also removes the days from the main doc,
+// and only after every archived month has been read back and matched exactly.
+const ARCHIVE_AFTER_DAYS = 75;
+const ARCHIVE_SECTIONS = ['logs', 'nutrition', 'dailySnapshots'];
+
+function groupOldDaysByMonth(st, cutoff) {
+  const byMonth = {};
+  ARCHIVE_SECTIONS.forEach(sec => {
+    Object.entries(st[sec] || {}).forEach(([dk, val]) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dk) || dk >= cutoff) return;
+      const m = dk.slice(0, 7);
+      if (!byMonth[m]) byMonth[m] = { logs: {}, nutrition: {}, dailySnapshots: {} };
+      byMonth[m][sec][dk] = cleanForFirestore(val);
+    });
+  });
+  return byMonth;
+}
+
+function stableStringify(v) {
+  if (Array.isArray(v)) return '[' + v.map(stableStringify).join(',') + ']';
+  if (v && typeof v === 'object') {
+    return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + stableStringify(v[k])).join(',') + '}';
+  }
+  return JSON.stringify(v);
+}
+
+async function archiveOldData(mode) {
+  if (!stateLoaded) return;
+  const cutoff = dateKey(-ARCHIVE_AFTER_DAYS);
+  const byMonth = groupOldDaysByMonth(state, cutoff);
+  const months = Object.keys(byMonth).sort();
+  if (!months.length) { showToast('Nothing to archive', ''); return; }
+
+  try {
+    for (const m of months) {
+      const ref = doc(db, 'users', 'default', 'archive', m);
+      await setDoc(ref, byMonth[m], { merge: true });
+      const back = (await getDoc(ref)).data() || {};
+      for (const sec of ARCHIVE_SECTIONS) {
+        for (const [dk, val] of Object.entries(byMonth[m][sec])) {
+          if (stableStringify(back[sec]?.[dk]) !== stableStringify(val)) {
+            throw new Error(`Verification failed for ${sec} ${dk}`);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Archive failed — main document left untouched:', err);
+    showToast('Archive failed — nothing was removed', 'error');
+    return;
+  }
+
+  const dayCount = months.reduce((n, m) => n + Object.keys(byMonth[m].logs).length, 0);
+  if (mode !== 'move') {
+    showToast(`Archived ${months.length} month(s) (copy only)`, 'success');
+    return;
+  }
+  if (!confirm(`Archived and verified ${months.length} month(s) (${dayCount} workout days).\nRemove them from the main document now?`)) return;
+
+  try {
+    const patch = {};
+    months.forEach(m => ARCHIVE_SECTIONS.forEach(sec => {
+      Object.keys(byMonth[m][sec]).forEach(dk => { patch[`${sec}.${dk}`] = deleteField(); });
+    }));
+    await updateDoc(STATE_DOC, patch);
+    months.forEach(m => ARCHIVE_SECTIONS.forEach(sec => {
+      Object.keys(byMonth[m][sec]).forEach(dk => { delete state[sec][dk]; });
+    }));
+    showToast('Old data moved to archive', 'success');
+  } catch (err) {
+    console.error('Removing archived days failed:', err);
+    showToast('Archive copied, but removal failed', 'error');
+  }
+}
+
 function waitForAuth() {
   return new Promise(resolve => {
     const unsub = onAuthStateChanged(auth, user => { unsub(); resolve(user); });
@@ -1226,6 +1304,11 @@ async function init() {
   if (stateLoaded) {
     restoreTimer();
     renderHome();
+    const archiveMode = new URLSearchParams(location.search).get('archive');
+    if (archiveMode === 'copy' || archiveMode === 'move') {
+      history.replaceState(null, '', location.pathname);
+      await archiveOldData(archiveMode);
+    }
   } else {
     document.getElementById('greeting-text').textContent = 'Failed to load — please refresh';
   }

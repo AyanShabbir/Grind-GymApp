@@ -25,7 +25,7 @@ Grind is a single-user workout/meal tracker PWA. Plain static files, no build st
 - Don't test against production data without saying so: previews and local runs use the same database.
 
 ## Known limitations / ideas
-- Whole history is in one doc (1 MB cap). Planned fix: archive old months to `users/default/archive/{YYYY-MM}` (needs a rules update; only delete from the main doc after verifying the archive).
+- Whole history lives in one doc (1 MB cap). `archiveOldData()` moves days older than `ARCHIVE_AFTER_DAYS` (75) into `users/default/archive/{YYYY-MM}`; it only runs via `?archive=copy` / `?archive=move` and needs the archive rule in Firestore. `move` deletes from the main doc only after every month is read back and matches. Archived days aren't loaded by the app (charts look back 60 days; prefill falls back to `bests`).
 - No service worker / offline support (intentional).
 - Weights are labelled lb; body weight is kg.
 
