@@ -1,7 +1,7 @@
 import { WORKOUT_PLAN, MEAL_PLAN } from './data.js';
 import { db, auth } from './firebase.js';
 import { onAuthStateChanged, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import { doc, getDoc, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { doc, getDoc, setDoc, updateDoc, deleteField } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ── STATE ──
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -107,8 +107,6 @@ function cleanForFirestore(obj) {
   ));
 }
 
-
-//04/21
 function openQtyModal(mealIdx) {
   const meal = MEAL_PLAN[mealIdx];
   const nut = state.nutrition[today()] || {};
@@ -230,9 +228,6 @@ async function doSave() {
   }
 }
 
-// function today() {
-//   return new Date().toISOString().split('T')[0];
-// }
 function today() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -304,7 +299,7 @@ function renderHome() {
     startBtn.className = 'start-workout-btn';
     startBtn.style = '';
   }
-    // Nutrition history 04/13
+    // Nutrition history
   const snapshots = state.dailySnapshots || {};
   const historyEl = document.getElementById('nutrition-history-list');
   const recent = Object.values(snapshots)
@@ -511,7 +506,6 @@ function renderExerciseCard(ex, idx, todayKey) {
   const best = state.bests[ex.id];
 
   const setsHtml = Array.from({ length: ex.sets }, (_, i) => {
-    // const setLog = log[i] || {};
     const setLog = log[i] || {};
     // Prefill per set: only fall back to the last session when this set has nothing of its own
     const last = (setLog.weight && setLog.reps) ? null : getLastLog(ex.id);
@@ -585,41 +579,6 @@ async function updateSet(exId, setIdx, field, value) {
   scheduleSave();
 }
 
-// async function toggleSetDone(exId, setIdx) {
-//   const todayKey = today();
-//   const log = state.logs[todayKey]?.exercises?.[exId]?.[setIdx];
-//   if (!log) return;
-
-//   log.done = !log.done;
-
-//   const btn = document.getElementById(`sd-${exId}-${setIdx}`);
-//   btn.className = `set-done-btn ${log.done ? 'done' : ''}`;
-//   btn.innerHTML = log.done ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>` : '';
-
-//   if (log.done) {
-//     checkPR(exId, log.weight, log.reps);
-//     startRestTimer(exId);
-//     state.logs[todayKey].sets = Object.values(state.logs[todayKey].exercises)
-//       .flat().filter(s => s?.done).length;
-//   }
-
-//   const plan = state.workoutPlan[todayDay()];
-//   const ex = plan.exercises.find(e => e.id === exId);
-//   const exLog = state.logs[todayKey].exercises[exId] || [];
-//   const allDone = exLog.length >= ex.sets && exLog.every(s => s?.done);
-
-//   const card = document.getElementById(`excard-${exId}`);
-//   const check = document.getElementById(`excheck-${exId}`);
-//   if (allDone) {
-//     card.classList.add('done-ex');
-//     check.className = 'ex-check checked';
-//     check.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>`;
-//   }
-
-//   await save();
-// }
-
-// 04/21
 async function toggleSetDone(exId, setIdx) {
   const todayKey = today();
   if (!state.logs[todayKey]) state.logs[todayKey] = { workoutDone: false, duration: 0, sets: 0, exercises: {}, prs: [] };
@@ -740,19 +699,6 @@ function toggleWorkout() {
   isWorkoutRunning ? pauseWorkout() : startWorkout();
 }
 
-// function startWorkout() {
-//   isWorkoutRunning = true;
-//   workoutStart = Date.now() - workoutElapsed * 1000;
-//   const elapsedEl = document.getElementById('workout-elapsed');
-//   elapsedEl.classList.remove('inactive');
-//   workoutTimer = setInterval(() => {
-//     workoutElapsed = Math.floor((Date.now() - workoutStart) / 1000);
-//     elapsedEl.textContent = formatTime(workoutElapsed);
-//   }, 1000);
-//   updateWorkoutBtn();
-// }
-
-// Auto save every 30 sec update 04/13
 function persistTimer() {
   try {
     if (!isWorkoutRunning && workoutElapsed === 0) { localStorage.removeItem(LS_TIMER); return; }
@@ -850,90 +796,6 @@ function closeModal() {
 }
 
 // ── MEALS ──
-// function renderMeals() {
-//     recalcNutrition();
-//     const weightInput = document.getElementById('user-weight-input');
-//     if (weightInput) weightInput.value = state.userWeight || 80;
-//   const todayKey = today();
-//   if (!state.nutrition[todayKey]) {
-//     state.nutrition[todayKey] = { protein: 0, calories: 0, burned: 0, meals: [] };
-//   }
-//   const nut = state.nutrition[todayKey];
-
-//   const pct = Math.min((nut.protein / 160) * 100, 100);
-//   document.getElementById('protein-logged').textContent = nut.protein;
-//   document.getElementById('protein-fill').style.width = pct + '%';
-
-//   document.getElementById('meal-dots').innerHTML = MEAL_PLAN.map((m, i) => {
-//     const logged = nut.meals.includes(i);
-//     return `<div class="dpb-meal ${logged ? 'logged' : ''}">${m.icon}<br>${logged ? '✓' : '—'}</div>`;
-//   }).join('');
-
-//   document.getElementById('meal-cards').innerHTML = MEAL_PLAN.map((meal, i) => {
-//     // Custom logged meals
-//     const isCustom = meal.time === 'Custom';          // ← ADD
-//     const qty = nut.mealQuantities?.[i] || 0;         // ← ADD
-
-//   if (isCustom) {                                   // ← ADD this whole block
-//     return `<div class="meal-card" style="margin-bottom:10px">
-//       <div class="meal-card-header">
-//         <div class="meal-icon-wrap">${meal.icon || '🍽️'}</div>
-//         <div class="meal-card-info">
-//           <div class="meal-card-time">${meal.time}</div>
-//           <div class="meal-card-name">${meal.name}</div>
-//           <div class="meal-card-protein">${qty ? `${meal.protein * qty}g protein · ${meal.calories * qty} kcal` : meal.note}</div>
-//         </div>
-//         <button class="meal-log-btn ${qty ? 'logged' : ''}" onclick="openQtyModal(${i})">
-//           ${qty ? `${qty}× ✓` : 'Log'}
-//         </button>
-//       </div>
-//     </div>`;
-//   }
-// const customMeals = nut.customMeals || [];
-// const customHtml = customMeals.length ? customMeals.map((m, i) => `
-//   <div class="meal-card" style="margin-bottom:10px">
-//     <div class="meal-card-header">
-//       <div class="meal-icon-wrap">🍴</div>
-//       <div class="meal-card-info">
-//         <div class="meal-card-time">${m.time}</div>
-//         <div class="meal-card-name">${m.name}</div>
-//         <div class="meal-card-protein">${m.protein}g protein · ${m.calories} kcal</div>
-//       </div>
-//       <button class="ex-edit-btn" style="color:var(--red)" onclick="deleteCustomMeal(${i})">✕</button>
-//     </div>
-//   </div>`).join('') : '';
-
-// document.getElementById('custom-meal-cards').innerHTML = customHtml;
-//     const logged = nut.meals.includes(i);
-//     return `<div class="meal-card" style="margin-bottom:10px">
-//       <div class="meal-card-header">
-//         <div class="meal-icon-wrap">${meal.icon}</div>
-//         <div class="meal-card-info">
-//           <div class="meal-card-time">${meal.time}</div>
-//           <div class="meal-card-name">${meal.name}</div>
-//           <div class="meal-card-protein">~${meal.protein}g protein</div>
-//         </div>
-//         <button class="meal-log-btn ${logged ? 'logged' : ''}" onclick="openQtyModal(${i})">
-//           ${logged ? 'Logged ✓' : 'Log'}
-//         </button>
-//       </div>
-//       <div class="meal-items-list">
-//         ${(meal.items || []).map(item => `<div class="meal-item">${item}</div>`).join('')}
-//         <div class="meal-note-text">${meal.note}</div>
-//       </div>
-//     </div>`;
-//   }).join('');
-  
-//   // 04/17
-//   // document.getElementById('cal-intake-display').textContent = nut.calories.toLocaleString();
-//   // document.getElementById('cal-burned-display').textContent = nut.burned.toLocaleString();
-//   // const net = nut.calories - nut.burned;
-//   // const netEl = document.getElementById('cal-net-display');
-//   // netEl.textContent = net.toLocaleString();
-//   // netEl.className = `cl-sum-val ${net <= 2200 ? 'green' : 'red'}`;
-//   document.getElementById('cal-intake-display').textContent = nut.calories.toLocaleString();
-//   document.getElementById('cal-burned-display').textContent = nut.burned.toLocaleString();
-// }
 
 function renderMeals() {
   recalcNutrition();
@@ -1018,42 +880,6 @@ function renderMeals() {
   document.getElementById('cal-burned-display').textContent = nut.burned.toLocaleString();
 }
 
-// async function toggleMeal(idx) {
-//   const todayKey = today();
-//   const nut = state.nutrition[todayKey];
-//   const meal = MEAL_PLAN[idx];
-
-//   if (nut.meals.includes(idx)) {
-//     nut.meals = nut.meals.filter(i => i !== idx);
-//     nut.protein = Math.max(0, nut.protein - meal.protein);
-//   } else {
-//     nut.meals.push(idx);
-//     nut.protein += meal.protein;
-//   }
-
-//   await save();
-//   renderMeals();
-// }
-
-// function calcBurned() {
-//   const todayKey = today();
-//   const log = state.logs[todayKey];
-//   const weightKg = state.userWeight || 80;
-
-//   const savedDuration = log?.duration || 0;
-//   const liveDuration = (savedDuration === 0 && workoutElapsed > 0) ? workoutElapsed : savedDuration;
-//   const liftingHrs = liveDuration / 3600;
-
-//   // Cardio warmup (fixed — 10 min bike + 10 min treadmill, always done)
-//   const bikeKcal = 8.0 * weightKg * (10 / 60);
-//   const treadmillKcal = 9.0 * weightKg * (10 / 60);
-
-//   // Weightlifting (based on actual session duration)
-//   const liftingKcal = 5.0 * weightKg * liftingHrs;
-
-//   return Math.round(bikeKcal + treadmillKcal + liftingKcal);
-// }
-
 function calcBurned() {
   const todayKey = today();
   const log = state.logs[todayKey];
@@ -1069,30 +895,6 @@ function calcBurned() {
 
   return Math.round(bikeKcal + treadmillKcal + liftingKcal);
 }
-
-
-// function recalcNutrition() {
-//   const todayKey = today();
-//   if (!state.nutrition[todayKey]) return;
-//   const nut = state.nutrition[todayKey];
-
-//   // Regular meal plan (toggled on/off)
-//   const mealPlanCals = (nut.meals || []).reduce((sum, i) => sum + (MEAL_PLAN[i]?.calories || 0), 0);
-//   const mealPlanProtein = (nut.meals || []).reduce((sum, i) => sum + (MEAL_PLAN[i]?.protein || 0), 0);
-
-//   // Custom MEAL_PLAN items with quantities
-//   const qtyEntries = Object.entries(nut.mealQuantities || {});
-//   const qtyCals    = qtyEntries.reduce((sum, [i, q]) => sum + (MEAL_PLAN[i]?.calories || 0) * q, 0);
-//   const qtyProtein = qtyEntries.reduce((sum, [i, q]) => sum + (MEAL_PLAN[i]?.protein  || 0) * q, 0);
-
-//   // Manually logged custom meals
-//   const customCals    = (nut.customMeals || []).reduce((sum, m) => sum + (m.calories || 0), 0);
-//   const customProtein = (nut.customMeals || []).reduce((sum, m) => sum + (m.protein  || 0), 0);
-
-//   nut.calories = mealPlanCals + qtyCals + customCals;
-//   nut.protein  = mealPlanProtein + qtyProtein + customProtein;
-//   nut.burned   = calcBurned();
-// }
 
 function recalcNutrition() {
   const todayKey = today();
@@ -1326,7 +1128,6 @@ window.toggleExCard = toggleExCard;
 window.updateSet = updateSet;
 window.toggleSetDone = toggleSetDone;
 window.skipRest = skipRest;
-// window.toggleMeal = toggleMeal;
 window.renderProgressChart = renderProgressChart;
 
 // ── EXERCISE EDITOR ──
@@ -1390,6 +1191,83 @@ window.saveEditEx  = saveEditEx;
 window.deleteEditEx = deleteEditEx;
 window.closeEditEx = closeEditEx;
 
+// ── ARCHIVE ──
+// Keeps the main document small (Firestore caps documents at 1 MB) by moving old days into
+// users/default/archive/YYYY-MM. Only runs when the app is opened with ?archive=copy or
+// ?archive=move. "copy" writes and verifies; "move" also removes the days from the main doc,
+// and only after every archived month has been read back and matched exactly.
+const ARCHIVE_AFTER_DAYS = 75;
+const ARCHIVE_SECTIONS = ['logs', 'nutrition', 'dailySnapshots'];
+
+function groupOldDaysByMonth(st, cutoff) {
+  const byMonth = {};
+  ARCHIVE_SECTIONS.forEach(sec => {
+    Object.entries(st[sec] || {}).forEach(([dk, val]) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dk) || dk >= cutoff) return;
+      const m = dk.slice(0, 7);
+      if (!byMonth[m]) byMonth[m] = { logs: {}, nutrition: {}, dailySnapshots: {} };
+      byMonth[m][sec][dk] = cleanForFirestore(val);
+    });
+  });
+  return byMonth;
+}
+
+function stableStringify(v) {
+  if (Array.isArray(v)) return '[' + v.map(stableStringify).join(',') + ']';
+  if (v && typeof v === 'object') {
+    return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + stableStringify(v[k])).join(',') + '}';
+  }
+  return JSON.stringify(v);
+}
+
+async function archiveOldData(mode) {
+  if (!stateLoaded) return;
+  const cutoff = dateKey(-ARCHIVE_AFTER_DAYS);
+  const byMonth = groupOldDaysByMonth(state, cutoff);
+  const months = Object.keys(byMonth).sort();
+  if (!months.length) { showToast('Nothing to archive', ''); return; }
+
+  try {
+    for (const m of months) {
+      const ref = doc(db, 'users', 'default', 'archive', m);
+      await setDoc(ref, byMonth[m], { merge: true });
+      const back = (await getDoc(ref)).data() || {};
+      for (const sec of ARCHIVE_SECTIONS) {
+        for (const [dk, val] of Object.entries(byMonth[m][sec])) {
+          if (stableStringify(back[sec]?.[dk]) !== stableStringify(val)) {
+            throw new Error(`Verification failed for ${sec} ${dk}`);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Archive failed — main document left untouched:', err);
+    showToast('Archive failed — nothing was removed', 'error');
+    return;
+  }
+
+  const dayCount = months.reduce((n, m) => n + Object.keys(byMonth[m].logs).length, 0);
+  if (mode !== 'move') {
+    showToast(`Archived ${months.length} month(s) (copy only)`, 'success');
+    return;
+  }
+  if (!confirm(`Archived and verified ${months.length} month(s) (${dayCount} workout days).\nRemove them from the main document now?`)) return;
+
+  try {
+    const patch = {};
+    months.forEach(m => ARCHIVE_SECTIONS.forEach(sec => {
+      Object.keys(byMonth[m][sec]).forEach(dk => { patch[`${sec}.${dk}`] = deleteField(); });
+    }));
+    await updateDoc(STATE_DOC, patch);
+    months.forEach(m => ARCHIVE_SECTIONS.forEach(sec => {
+      Object.keys(byMonth[m][sec]).forEach(dk => { delete state[sec][dk]; });
+    }));
+    showToast('Old data moved to archive', 'success');
+  } catch (err) {
+    console.error('Removing archived days failed:', err);
+    showToast('Archive copied, but removal failed', 'error');
+  }
+}
 
 function waitForAuth() {
   return new Promise(resolve => {
@@ -1426,6 +1304,11 @@ async function init() {
   if (stateLoaded) {
     restoreTimer();
     renderHome();
+    const archiveMode = new URLSearchParams(location.search).get('archive');
+    if (archiveMode === 'copy' || archiveMode === 'move') {
+      history.replaceState(null, '', location.pathname);
+      await archiveOldData(archiveMode);
+    }
   } else {
     document.getElementById('greeting-text').textContent = 'Failed to load — please refresh';
   }
